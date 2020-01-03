@@ -10,4 +10,4 @@ setup(name='nbimporter',
       py_modules=['nbimporter', 'display_nb'],
       license="BSD 3-clause",
       url='https://github.com/grst/nbimporter',
- )
+)

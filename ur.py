@@ -37,11 +37,12 @@ Related reading:
 """
 
 import ast
-import io
+from io import BytesIO
 import os
 import sys
 from inspect import stack
 from re import match
+from requests import get as GET
 from tempfile import NamedTemporaryFile
 from types import ModuleType
 from urllib.parse import urlparse
@@ -85,7 +86,7 @@ class URLLoader:
 
         url = urlparse(path)
         if url.scheme:
-            if match(url.scheme, '^https?'):
+            if match('^https?$', url.scheme):
                 domain = url.netloc
                 if domain == 'gist.github.com':
 
@@ -94,38 +95,35 @@ class URLLoader:
 
                     kwargs_gist_url = None
                     if gist:
-                        m = match(gist, maybe(f'(?P<user>{chars})/') + f'(?P<id>{chars})')
+                        maybe_user = maybe(f'(?P<user>{chars})/')
+                        id_re = f'(?P<id>{chars})'
+                        m = match(gist, f'^{maybe_user}{id_re}$')
                         if not m:
                             raise Exception(f'Unrecognized gist: {gist}')
 
                         user = m.group('user')
                         id = m.group('id')
 
-
                         kwargs_gist_url = GistURL(id=id, user=user, tree=tree, file=file)
 
-                    gist_url = GistURL.from_url_path(url.path)
+                    gist_url = GistURL.from_url_path(url.path, url.fragment)
+                    print(f'gist_url: {gist_url}')
                     if kwargs_gist_url:
                         gist_url = gist_url.merge(kwargs_gist_url)
+                        print(f'updated gist_url: {gist_url}')
 
                     raw_urls = gist_url.raw_urls()
-
+                    print(f'raw_urls: {raw_urls}')
                     if not raw_urls:
                         raise Exception(f'No raw URLs found for gist {gist_url.url}')
 
-                    # def
+                    if len(raw_urls) > 1:
+                        raise NotImplementedError('Importing gists with multiple notebooks not supported… yet!')
 
-                    return [
-                        self.main(
-                            raw_url,
-                            encoding=encoding,
-                            run_nbinit=run_nbinit,
-                            only_defs=only_defs,
-                            all=all,
-                        )
-                        for raw_url
-                        in raw_urls
-                    ]
+                    [ raw_url ] = raw_urls
+                    # Pass through to the rest of the function
+                    path = raw_url
+                    print(f'fwding on {raw_url}: {path}')
 
                 elif domain == 'github.com':
                     raise NotImplementedError
@@ -136,18 +134,20 @@ class URLLoader:
             else:
                 raise Exception(f'Unsupported URL scheme: {url.scheme}')
 
-        if not url.scheme:
-            pass
         # load the notebook object
         nb_version = nbformat.version_info[0]
 
         if url.scheme:
-            with NamedTemporaryFile() as f:
-                urlretrieve(path, f.name)
-                with io.open(f.name, 'r', encoding=encoding) as f:
-                    nb = nbformat.read(f, nb_version)
+            json = GET(path).content
+            f = BytesIO(json)
+            print(f'Downloaded nb content: {json.decode()}')
+            nb = nbformat.read(f, nb_version)
+            # with NamedTemporaryFile() as f:
+            #     urlretrieve(path, f.name)
+            #     with io.open(f.name, 'r', encoding=encoding) as f:
+            #         nb = nbformat.read(f, nb_version)
         else:
-            with io.open(path, 'r', encoding=encoding) as f:
+            with open(path, 'r', encoding=encoding) as f:
                 nb = nbformat.read(f, nb_version)
 
         # create the module and add it to sys.modules

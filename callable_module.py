@@ -14,5 +14,3 @@ class CallableModule(ModuleType):
 
     def __getattr__(self, attr):
         return object.__getattribute__(self._wrapped, attr)
-
-

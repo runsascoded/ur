@@ -8,26 +8,27 @@ def maybe(re):
     return f'(?:{re})'
 
 
-chars = '[A-Za-z\-_0-9]+'
+file_chars = '[A-Za-z0-9_\-\.]+'
+chars = '[A-Za-z0-9_\-]+'
 hexs = '[a-f0-9]+'
 
 user_re = maybe(f'(?P<user>{chars})')
 id_re = f'(?P<id>{hexs})'
 raw_re = f'(?P<raw>raw)'
 tree_re = maybe(f'(?P<tree>{hexs})')
-file_re = maybe(f'(?P<file>{chars})')
+file_re = maybe(f'(?P<file>{file_chars})')
 fragment_re = maybe(f'(?P<fragment>{chars})')
 
-full_raw_url_path = f'/{user_re}/{id_re}/{raw_re}/{tree_re}/{file_re}'
+full_raw_url_path = f'^/{user_re}/{id_re}/{raw_re}/{tree_re}/{file_re}$'
 
 regexs = [
-    f'/{user_re}/{id_re}',
-    f'/{user_re}/{id_re}#{fragment_re}',
-    f'/{user_re}/{id_re}/{tree_re}',
-    f'/{user_re}/{id_re}/{tree_re}#{fragment_re}',
-    f'/{user_re}/{id_re}/{raw_re}',
-    f'/{user_re}/{id_re}/{raw_re}/{file_re}',
-    f'/{user_re}/{id_re}/{raw_re}/{tree_re}',
+    f'^/{user_re}/{id_re}$',
+    f'^/{user_re}/{id_re}#{fragment_re}$',
+    f'^/{user_re}/{id_re}/{tree_re}$',
+    f'^/{user_re}/{id_re}/{tree_re}#{fragment_re}$',
+    f'^/{user_re}/{id_re}/{raw_re}$',
+    f'^/{user_re}/{id_re}/{raw_re}/{file_re}$',
+    f'^/{user_re}/{id_re}/{raw_re}/{tree_re}$',
     full_raw_url_path,
 ]
 
@@ -80,9 +81,9 @@ class GistURL(NamedTuple):
         return GistURL(**m.groupdict())
 
     @classmethod
-    def from_url_path(cls, path):
-        matches = [ (match(regex, path).groupdict(), regex) for regex in regexs ]
-        matches = [ m for m in matches if m ]
+    def from_url_path(cls, path, fragment=None):
+        matches = [ (match(regex, path), regex) for regex in regexs ]
+        matches = [ (m.groupdict(), regex) for m, regex in matches if m ]
         if not matches:
             raise Exception(f'Failed to parse gist.github.com URL: {path}')
         num_matches = len(matches)
@@ -102,6 +103,7 @@ class GistURL(NamedTuple):
             user = m.get('user'),
             tree = m.get('tree'),
             file = m.get('file'),
+            fragment = fragment,
         )
 
     def raw_urls(self):
@@ -124,9 +126,13 @@ class GistURL(NamedTuple):
 
             [ link ] = f.cssselect('.file-info > .css-truncate')
             fragment = link.attrib['href']
+            if not fragment.startswith('#'):
+                raise Exception(f'Expected file header for {gist_url.file} to be an intra-page fragment link; found {fragment}')
+            fragment = fragment[1:]
 
             files[gist_url.file] = dict(gist_url=gist_url, fragment=fragment,)
 
+        print(f'Fetched files: {files}')
         if self.file:
             if self.file not in files:
                 raise Exception(f'File {self.file} not found in {url}')

@@ -1,13 +1,11 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 from distutils.core import setup
 
-setup(name='nbimporter',
-      version='0.3.1',
-      description='Import IPython notebooks as modules',
-      author='Gregor Sturm',
-      author_email='mail@gregor-sturm.de',
-      py_modules=['nbimporter', 'display_nb'],
-      license="BSD 3-clause",
-      url='https://github.com/grst/nbimporter',
+setup(name='ur',
+      version='0.1.0',
+      description='Import remote (by URL) Jupyter notebooks (or Python files)',
+      author='Ryan Williams',
+      author_email='ryan@runsascoded.com',
+      py_modules=['ur',],
+      license='MIT',
+      url='https://github.com/ryan-runsascoded/ur',
 )

@@ -36,77 +36,28 @@ Related reading:
 - https://github.com/deathbeds/importnb: jupyter importer / module-runner; similar to papermill?
 """
 
-import io, os, sys, types, ast
+import ast
+import io
+import os
+import sys
 from inspect import stack
-import nbformat
+from re import match
 from tempfile import NamedTemporaryFile
+from types import ModuleType
 from urllib.parse import urlparse
 from urllib.request import urlretrieve
+
+import nbformat
 from IPython import get_ipython
 from IPython.core.interactiveshell import InteractiveShell
 
-import sys
-from types import ModuleType
-
-print('ur top: %s' % ' '.join(globals().keys()))
-# print(
-#     '\n'.join([
-#         '%s:\n%s\n' % (name, globals()[name])
-#         for name in [
-#             '__name__', '__package__', '__loader__', '__spec__', '__file__', '__cached__', '__builtins__'
-#         ]
-#     ])
-# )
-
-class CallableModule(ModuleType):
-
-    def __init__(self, wrapped):
-        super(CallableModule, self).__init__(wrapped.__name__)
-        self._wrapped = wrapped
-
-    def __call__(self, *args, **kwargs):
-        return self._wrapped.main(*args, **kwargs)
-
-    def __getattr__(self, attr):
-        return object.__getattribute__(self._wrapped, attr)
+from callable_module import CallableModule
+from cells import CellDeleter
+from gist_url import GistURL, chars, maybe
+from notebooks import find_notebook
 
 
 sys.modules[__name__] = CallableModule(sys.modules[__name__])
-
-options = {'only_defs': True, 'run_nbinit': True, 'encoding': 'utf-8'}
-
-def find_notebook(fullname, path=None):
-    """ Find a notebook, given its fully qualified name and an optional path
-
-    This turns "foo.bar" into "foo/bar.ipynb"
-    and tries turning "Foo_Bar" into "Foo Bar" if Foo_Bar
-    does not exist.
-    """
-    name = fullname.rsplit('.', 1)[-1]
-    print(f'find_notebook: fullname {fullname}, path {path}, name {name}')
-    if not path:
-        path = ['']
-    for d in path:
-        nb_path = os.path.join(d, name + ".ipynb")
-        if os.path.isfile(nb_path):
-            print(f'Found {nb_path}')
-            return nb_path
-        # let import Notebook_Name find "Notebook Name.ipynb"
-        nb_path = nb_path.replace("_", " ")
-        if os.path.isfile(nb_path):
-            print(f'Found {nb_path}')
-            return nb_path
-
-
-class CellDeleter(ast.NodeTransformer):
-    """ Removes all nodes from an AST which are not suitable
-    for exporting out of a notebook. """
-    def visit(self, node):
-        """ Visit a node. """
-        if node.__class__.__name__ in ['Module', 'FunctionDef', 'ClassDef',
-                                       'Import', 'ImportFrom']:
-            return node
-        return None
 
 
 class URLLoader:
@@ -115,37 +66,102 @@ class URLLoader:
         self.shell = InteractiveShell.instance()
         self.path = path
 
-    def main(self, path, *names, _globals=None):
-        url = urlparse(path)
-        print(f'load_module: {path} -> {url}')
+    def main(
+        self,
+        path=None,
+        encoding='utf-8',
+        run_nbinit=True,
+        only_defs=True,
+        all=False,
+        *names,
+        **kwargs,
+    ):
+        gist = kwargs.get('gist')
+        github = kwargs.get('github')
+        gitlab = kwargs.get('gitlab')
+        tree = kwargs.get('tree')
+        pkg = kwargs.get('pkg')
+        file = kwargs.get('file')
 
+        url = urlparse(path)
+        if url.scheme:
+            if match(url.scheme, '^https?'):
+                domain = url.netloc
+                if domain == 'gist.github.com':
+
+                    assert not gitlab
+                    assert not pkg
+
+                    kwargs_gist_url = None
+                    if gist:
+                        m = match(gist, maybe(f'(?P<user>{chars})/') + f'(?P<id>{chars})')
+                        if not m:
+                            raise Exception(f'Unrecognized gist: {gist}')
+
+                        user = m.group('user')
+                        id = m.group('id')
+
+
+                        kwargs_gist_url = GistURL(id=id, user=user, tree=tree, file=file)
+
+                    gist_url = GistURL.from_url_path(url.path)
+                    if kwargs_gist_url:
+                        gist_url = gist_url.merge(kwargs_gist_url)
+
+                    raw_urls = gist_url.raw_urls()
+
+                    if not raw_urls:
+                        raise Exception(f'No raw URLs found for gist {gist_url.url}')
+
+                    # def
+
+                    return [
+                        self.main(
+                            raw_url,
+                            encoding=encoding,
+                            run_nbinit=run_nbinit,
+                            only_defs=only_defs,
+                            all=all,
+                        )
+                        for raw_url
+                        in raw_urls
+                    ]
+
+                elif domain == 'github.com':
+                    raise NotImplementedError
+                elif domain == 'gitlab.com':
+                    raise NotImplementedError
+                else:
+                    raise NotImplementedError
+            else:
+                raise Exception(f'Unsupported URL scheme: {url.scheme}')
+
+        if not url.scheme:
+            pass
         # load the notebook object
         nb_version = nbformat.version_info[0]
 
         if url.scheme:
             with NamedTemporaryFile() as f:
-                print(f'Fetching {path} to {f.name}')
                 urlretrieve(path, f.name)
-                with io.open(f.name, 'r', encoding=options['encoding']) as f:
+                with io.open(f.name, 'r', encoding=encoding) as f:
                     nb = nbformat.read(f, nb_version)
         else:
-            with io.open(path, 'r', encoding=options['encoding']) as f:
+            with io.open(path, 'r', encoding=encoding) as f:
                 nb = nbformat.read(f, nb_version)
 
         # create the module and add it to sys.modules
         # if name in sys.modules:
         #    return sys.modules[name]
-        mod = types.ModuleType(path)
+        mod = ModuleType(path)
         mod.__file__ = path
         mod.__loader__ = self
         mod.__dict__['get_ipython'] = get_ipython
 
         # Only do something if it's a python notebook
         if nb.metadata.kernelspec.language != 'python':
-            print("Ignoring '%s': not a python notebook." % path)
             return
 
-        # print("Importing Jupyter notebook from %s" % path)
         sys.modules[path] = mod
 
         # extra work to ensure that magics that would affect the user_ns
@@ -158,8 +174,7 @@ class URLLoader:
             for cell in filter(lambda c: c.cell_type == 'code', nb.cells):
                 # transform the input into executable Python
                 code = self.shell.input_transformer_manager.transform_cell(cell.source)
-                print(f'cell code:\n{code}')
-                if options['only_defs']:
+                if only_defs:
                     # Remove anything that isn't a def or a class
                     tree = deleter.generic_visit(ast.parse(code))
                 else:
@@ -171,56 +186,42 @@ class URLLoader:
             self.shell.user_ns = save_user_ns
 
         # Run any initialisation if available, but only once
-        if options['run_nbinit'] and '__nbinit_done__' not in mod.__dict__:
-            try:
+        if run_nbinit and '__nbinit_done__' not in mod.__dict__:
+            if hasattr(mod, '__nbinit__'):
                 mod.__nbinit__()
                 mod.__nbinit_done__ = True
-            except (KeyError, AttributeError) as _:
-                pass
 
-        if names:
-            mod_dict = mod.__dict__
-            if hasattr(mod, '__all__'):
-                members = mod.__all__
-            else:
-                members = [ name for name in mod_dict if not name.startswith('_') ]
-
-            import_all = '*' in names
-            if import_all:
-                names = [ name for name in names if not name == '*' ]
-
-            not_found = list(set(names).difference(members))
-            if not_found:
-                raise Exception('Names not found: %s' % ','.join(not_found))
-
-            if not import_all:
-                members = names
-
-            update = { name: mod_dict[name] for name in members }
-            # print('importing: %s' % update)
-            stk = stack()
-            cur_file = stk[0].filename
-            frame_info = next(frame for frame in stk if frame.filename != cur_file)
-            # _globals = parent.f_globals
-            # if _globals:
-            #     _globals.update(update)
-            frame_info.frame.f_globals.update(update)
-            if _globals:
-                _globals['stk'] = stk
-                _globals['frame_info'] = frame_info
-            #globals().update(update)
+        if not names:
             return mod
-            # print('globals: %s' % globals()['foo'])
+
+        mod_dict = mod.__dict__
+        if hasattr(mod, '__all__'):
+            members = mod.__all__
         else:
-            return mod
+            members = [ name for name in mod_dict if not name.startswith('_') ]
+
+        import_all = '*' in names
+        if import_all:
+            names = [ name for name in names if not name == '*' ]
+
+        not_found = list(set(names).difference(members))
+        if not_found:
+            raise Exception('Names not found: %s' % ','.join(not_found))
+
+        if not import_all:
+            members = names
+
+        update = { name: mod_dict[name] for name in members }
+        stk = stack()
+        cur_file = stk[0].filename
+        frame_info = next(frame for frame in stk if frame.filename != cur_file)
+        frame_info.frame.f_globals.update(update)
+        return mod
 
 
 _loader = URLLoader()
-def main(path, *names, _globals=None):
-
-    print('main 1: %s' % ' '.join(globals().keys()))
-    ret = _loader.main(path, *names, _globals=_globals)
-    print('main 2: %s' % ' '.join(globals().keys()))
+def main(path, *names):
+    ret = _loader.main(path, *names)
     return ret
 
 
@@ -246,102 +247,3 @@ class URLFinder(object):
 
 
 sys.meta_path.append(URLFinder())
-
-class NotebookLoader(object):
-    """ Module Loader for Jupyter Notebooks. """
-
-    def __init__(self, path=None):
-        self.shell = InteractiveShell.instance()
-        self.path = path
-
-    def load_module(self, fullname):
-        """import a notebook as a module"""
-        url = urlparse(fullname)
-        print(f'load_module: {fullname} -> {url}')
-
-        # load the notebook object
-        nb_version = nbformat.version_info[0]
-
-        if url.scheme:
-            with NamedTemporaryFile() as f:
-                print(f'Fetching {fullname} to {f.name}')
-                urlretrieve(fullname, f.name)
-                path = f.name
-                with io.open(path, 'r', encoding=options['encoding']) as f:
-                    nb = nbformat.read(f, nb_version)
-                path = fullname
-        else:
-            path = find_notebook(fullname, self.path)
-            with io.open(path, 'r', encoding=options['encoding']) as f:
-                nb = nbformat.read(f, nb_version)
-
-        # create the module and add it to sys.modules
-        # if name in sys.modules:
-        #    return sys.modules[name]
-        mod = types.ModuleType(fullname)
-        mod.__file__ = path
-        mod.__loader__ = self
-        mod.__dict__['get_ipython'] = get_ipython
-
-        # Only do something if it's a python notebook
-        if nb.metadata.kernelspec.language != 'python':
-            print("Ignoring '%s': not a python notebook." % path)
-            return mod
-
-        print("Importing Jupyter notebook from %s" % path)
-        sys.modules[fullname] = mod
-
-        # extra work to ensure that magics that would affect the user_ns
-        # actually affect the notebook module's ns
-        save_user_ns = self.shell.user_ns
-        self.shell.user_ns = mod.__dict__
-                        
-        try:
-            deleter = CellDeleter()
-            for cell in filter(lambda c: c.cell_type == 'code', nb.cells):
-                # transform the input into executable Python
-                code = self.shell.input_transformer_manager.transform_cell(cell.source)
-                if options['only_defs']:
-                    # Remove anything that isn't a def or a class
-                    tree = deleter.generic_visit(ast.parse(code))
-                else:
-                    tree = ast.parse(code)
-                # run the code in the module
-                codeobj = compile(tree, filename=path, mode='exec')
-                exec(codeobj, mod.__dict__)
-        finally:
-            self.shell.user_ns = save_user_ns
-
-        # Run any initialisation if available, but only once
-        if options['run_nbinit'] and '__nbinit_done__' not in mod.__dict__:
-            try:
-                mod.__nbinit__()
-                mod.__nbinit_done__ = True
-            except (KeyError, AttributeError) as _:
-                pass
-
-        return mod
-
-
-class NotebookFinder(object):
-    """Module finder that locates Jupyter Notebooks"""
-    def __init__(self):
-        self.loaders = {}
-
-    def find_module(self, fullname, path=None):
-        print(f'find_module: ${fullname}, ${path}')
-        nb_path = find_notebook(fullname, path)
-        if not nb_path:
-            return
-
-        key = path
-        if path:
-            # lists aren't hashable
-            key = os.path.sep.join(path)
-
-        if key not in self.loaders:
-            self.loaders[key] = NotebookLoader(path)
-        return self.loaders[key]
-    
-    
-#sys.meta_path.append(NotebookFinder())

@@ -37,28 +37,41 @@ Related reading:
 """
 
 import ast
-from io import BytesIO
 import os
 import sys
 from inspect import stack
+from io import BytesIO
 from re import match
-from requests import get as GET
-from tempfile import NamedTemporaryFile
 from types import ModuleType
 from urllib.parse import urlparse
-from urllib.request import urlretrieve
 
 import nbformat
 from IPython import get_ipython
 from IPython.core.interactiveshell import InteractiveShell
+from requests import get as GET
 
-from callable_module import CallableModule
 from cells import CellDeleter
 from gist_url import GistURL, chars, maybe
 from notebooks import find_notebook
 
 
-sys.modules[__name__] = CallableModule(sys.modules[__name__])
+class UrModule(ModuleType):
+
+    def __init__(self, wrapped):
+        super(UrModule, self).__init__(wrapped.__name__)
+        self._wrapped = wrapped
+
+    def __mul__(self, *args, **kwargs):
+        return self(*(args + ('*',)), **kwargs)
+
+    def __call__(self, *args, **kwargs):
+        return self._wrapped.main(*args, **kwargs)
+
+    def __getattr__(self, attr):
+        return object.__getattribute__(self._wrapped, attr)
+
+
+sys.modules[__name__] = UrModule(sys.modules[__name__])
 
 
 class URLLoader:
@@ -70,11 +83,11 @@ class URLLoader:
     def main(
         self,
         path=None,
+        *names,
         encoding='utf-8',
         run_nbinit=True,
         only_defs=True,
         all=False,
-        *names,
         **kwargs,
     ):
         gist = kwargs.get('gist')
@@ -130,7 +143,7 @@ class URLLoader:
                 elif domain == 'gitlab.com':
                     raise NotImplementedError
                 else:
-                    raise NotImplementedError
+                    pass
             else:
                 raise Exception(f'Unsupported URL scheme: {url.scheme}')
 
@@ -140,12 +153,7 @@ class URLLoader:
         if url.scheme:
             json = GET(path).content
             f = BytesIO(json)
-            print(f'Downloaded nb content: {json.decode()}')
             nb = nbformat.read(f, nb_version)
-            # with NamedTemporaryFile() as f:
-            #     urlretrieve(path, f.name)
-            #     with io.open(f.name, 'r', encoding=encoding) as f:
-            #         nb = nbformat.read(f, nb_version)
         else:
             with open(path, 'r', encoding=encoding) as f:
                 nb = nbformat.read(f, nb_version)

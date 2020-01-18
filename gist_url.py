@@ -3,10 +3,7 @@ from tempfile import NamedTemporaryFile
 from typing import NamedTuple
 from urllib.request import urlretrieve
 
-
-def maybe(re):
-    return f'(?:{re})'
-
+from regex import maybe
 
 file_chars = '[A-Za-z0-9_\-\.]+'
 chars = '[A-Za-z0-9_\-]+'

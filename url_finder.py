@@ -1,6 +1,6 @@
 import sys
 
-from ur import find_notebook
+from notebooks import find_notebook
 from url_loader import URLLoader
 
 
@@ -10,7 +10,7 @@ class URLFinder(object):
         self.loaders = {}
 
     def find_module(self, fullname, path=None):
-        print(f'find_module: ${fullname}, ${path}')
+        print(f'url_finder.find_module: {fullname}, {path}')
         nb_path = find_notebook(fullname, path)
         if not nb_path:
             return

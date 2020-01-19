@@ -1,17 +1,12 @@
-import json
-from os import environ as env
-from pathlib import Path
-from re import match
 from subprocess import check_call
 from tempfile import NamedTemporaryFile
 from urllib.request import urlretrieve
 
-import nbimporter
-from cached_objs import Meta
-
+from nbimporter import nbimporter
+from cached_objs import Meta, field
+from git import Repo
 
 from gist_url import GistURL
-from gist_url import chars, hexs
 
 
 class File:
@@ -30,6 +25,9 @@ class File:
     def __str__(self):
         return self.name
 
+    def __repr__(self):
+        return self.name
+
     def url(self):
         return f'https://gist.githubusercontent.com/{self.gist.user}/{self.gist.id}/raw/{self.name}'
 
@@ -41,19 +39,19 @@ class Gist(metaclass=Meta):
 
     @property
     def git_url(self):
-        return GistCache.git_url(self.id)
+        return f'git@gist.github.com:{self.id}.git'
 
-    @property
+    @field
     def url(self):
         return f'https://gist.github.com/{self.id}'
 
-    @property
+    @field
     def user(self):
         root = self.xml
         [ author_link ] = root.cssselect('.author > a')
         return author_link.text
 
-    @property
+    @field
     def xml(self):
         from lxml.etree import fromstring, XMLParser
         parser = XMLParser(recover=True)
@@ -61,104 +59,53 @@ class Gist(metaclass=Meta):
             urlretrieve(self.url, f.name)
             return fromstring(f.read(), parser)
 
-    @property
+    @field
     def author(self):
         return self.clone.active_branch.commit.author.email
 
-    @property
+    @field(
+        load=lambda path, **_: Repo(path),
+        save=lambda path, repo, **_: None
+    )
     def clone(self):
-        dest = self._dir / 'clone'
-        check_call([ 'git', 'clone', self.git_url, str(dest) ])
-        from git import Repo
+        url = self.git_url
+        dest = self.cloned_dir
+        print(f'Cloning {url} into {dest}')
+        check_call([ 'git', 'clone', url, str(dest) ])
         return Repo(dest)
 
     @property
+    def cloned_dir(self):
+        return self._dir / 'clone'
+
+    @property
     def files(self):
-        if not self._files:
-            cloned_dir = self.cloned_dir
-            self._files = [ File(file) for file in cloned_dir.iterdir() ]
-        return self._files
+        return [ File(self, file) for file in self.cloned_dir.iterdir() ]
 
     @property
     def files_dict(self):
         return { file.name: file for file in self.files }
 
     @property
+    def file_bases_dict(self):
+        return { k.rpartition('.')[0]: v for k, v in self.files_dict.items() }
+
+    @field
     def fragments(self):
-        if not self._fragments:
-            root = self.xml
-            file_elems = root.cssselect('.file')
-            fragments = {}
-            for f in file_elems:
-                [ raw_a ] = f.xpath('.//a[contains(., "Raw")]')
-                raw_url_path = raw_a.attrib['href']
-                gist_url = GistURL.from_full_raw_url_path(raw_url_path)
+        root = self.xml
+        file_elems = root.cssselect('.file')
+        fragments = {}
+        for f in file_elems:
+            [ raw_a ] = f.xpath('.//a[contains(., "Raw")]')
+            raw_url_path = raw_a.attrib['href']
+            gist_url = GistURL.from_full_raw_url_path(raw_url_path)
 
-                [ link ] = f.cssselect('.file-info > .css-truncate')
-                fragment = link.attrib['href']
-                if not fragment.startswith('#'):
-                    raise Exception(f'Expected file header for {gist_url.file} to be an intra-page fragment link; found {fragment}')
-                fragment = fragment[1:]
+            [ link ] = f.cssselect('.file-info > .css-truncate')
+            fragment = link.attrib['href']
+            if not fragment.startswith('#'):
+                raise Exception(f'Expected file header for {gist_url.file} to be an intra-page fragment link; found {fragment}')
+            fragment = fragment[1:]
 
-                fragments[gist_url.file] = fragment
+            fragments[gist_url.file] = fragment
 
-            self._fragments = fragments
-
-        return self._fragments
-
-
-class GistCache:
-    CACHE_PATH_ENV_VAR = 'GIST_CACHE_PATH'
-    DEFAULT_CACHE_PATH = '.gists'
-
-    CACHES = {}
-
-    def __init__(self, path=None):
-        path = self.resolve(path)
-        if not path.exists():
-            path.mkdir(parents=True, exist_ok=True)
-
-        if path in self.CACHES:
-            raise Exception(f"Can't instantiate another cache pointing at {path}")
-
-        self.CACHES[path] = self
-        self._path = path
-
-        gists = {}
-        self.gists = gists
-
-        for child in path.iterdir():
-            self._load_gist(child)
-
-    @classmethod
-    def resolve(cls, path):
-        if cls.CACHE_PATH_ENV_VAR in env:
-            path = env[cls.CACHE_PATH_ENV_VAR]
-        else:
-            path = Path.home() / cls.DEFAULT_CACHE_PATH
-
-        return Path(path).resolve().absolute()
-
-    @classmethod
-    def get(cls, path):
-        path = cls.resolve(path)
-        if path in cls.CACHES:
-            return cls.CACHES[path]
-
-        return GistCache(path)
-
-    def _load_gist(self, path):
-        return Gist.load(path, cache=self)
-
-    def path(self, id):
-        return self._path / id
-
-    @classmethod
-    def git_url(cls, id):
-        return f'git@gist.github.com:{id}.git'
-
-    def __call__(self, id):
-        if id not in self.gists:
-            gist = Gist(id, cache=self)
-            self.gists[id] = gist
-        return self.gists[id]
+        return fragments

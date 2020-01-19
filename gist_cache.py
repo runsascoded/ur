@@ -6,6 +6,10 @@ from subprocess import check_call
 from tempfile import NamedTemporaryFile
 from urllib.request import urlretrieve
 
+import nbimporter
+from cached_objs import Meta
+
+
 from gist_url import GistURL
 from gist_url import chars, hexs
 
@@ -33,65 +37,7 @@ class File:
         return f'https://gist.github.com/{self.gist.user}/{self.gist.id}#file-a_b-ipynb'
 
 
-class Gist:
-    def __init__(self, id, user=None, author=None, dir=None, xml=None, fragments=None, cache=None):
-        m = match(f'^(?P<user>{chars})/(?P<id>{hexs})$', id)
-        if m:
-            matches = m.groupdict()
-            u = matches['user']
-            assert user is None or (user == matches['user']), f'{user} ⟹ ({user} == {u})'
-            user = u
-            id = matches['id']
-
-        self.id = id
-
-        self.cache = None
-        if isinstance(cache, GistCache)
-            self.cache = cache
-        else:
-            self.cache = GistCache.get(cache)
-
-        self._dir = self.cache.path(self.id)
-
-        self._author = author
-        self._fragments = fragments
-        self._user = user
-        self._xml = xml
-        self._files = None
-
-    def clone_dir(self):
-        return self._dir / 'clone'
-
-    @classmethod
-    def load(cls, dir, cache):
-        id = dir.name
-
-        xml = None
-        xml_path = dir / 'xml'
-        if xml_path.exists():
-            from lxml.etree import fromstring, XMLParser
-            parser = XMLParser(recover=True)
-            with xml_path.open('r') as f:
-                xml = fromstring(f.read(), parser)
-
-        kwargs = {}
-        for k in [
-            'author',
-            'user',
-            'fragments',
-            'xml',
-        ]:
-            path = dir / k
-            if path.exists():
-                with path.open('r') as f:
-                    if k == 'xml':
-                        from lxml.etree import fromstring, XMLParser
-                        parser = XMLParser(recover=True)
-                        kwargs[k] = fromstring(f.read(), parser)
-                    else:
-                        kwargs[k] = json.load(f)
-
-        return Gist(id, dir=dir, cache=cache, **kwargs)
+class Gist(metaclass=Meta):
 
     @property
     def git_url(self):
@@ -103,39 +49,28 @@ class Gist:
 
     @property
     def user(self):
-        if not self._user:
-            root = self.xml
-            [ author_link ] = root.cssselect('.author > a')
-            self._user = author_link.text
-        return self._user
+        root = self.xml
+        [ author_link ] = root.cssselect('.author > a')
+        return author_link.text
 
     @property
     def xml(self):
-        if not self._xml:
-            from lxml.etree import fromstring, XMLParser
-            parser = XMLParser(recover=True)
-            with NamedTemporaryFile() as f:
-                urlretrieve(self.url, f.name)
-                self._xml = fromstring(f.read(), parser)
-        return self._xml
+        from lxml.etree import fromstring, XMLParser
+        parser = XMLParser(recover=True)
+        with NamedTemporaryFile() as f:
+            urlretrieve(self.url, f.name)
+            return fromstring(f.read(), parser)
 
     @property
     def author(self):
-        if not self._author:
-            cloned_dir = self.cloned_dir
-            from git import Repo
-            repo = Repo(cloned_dir)
-            self.cache.path(self.id)
-            self._author = repo.active_branch.commit.author.email
-        return self._author
+        return self.clone.active_branch.commit.author.email
 
     @property
-    def cloned_dir(self):
-        if not self._dir:
-            self.cache(self.id)
-            self._dir = self.cache.path(self.id)
-
-        return self._dir
+    def clone(self):
+        dest = self._dir / 'clone'
+        check_call([ 'git', 'clone', self.git_url, str(dest) ])
+        from git import Repo
+        return Repo(dest)
 
     @property
     def files(self):

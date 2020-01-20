@@ -1,8 +1,9 @@
 from functools import partial, wraps
+from inspect import signature, _ParameterKind as Kind
 from pathlib import Path
 
-from .field import Field
-
+from .field import DirectField, Field
+from .loader import Loader
 
 class Meta(type):
 
@@ -75,15 +76,46 @@ class Meta(type):
 
         for name, member in dct.items():
             print(f'Checking: {name}: {member}')
+
+            def _bind(fn, name, **_kw):
+                kw = _kw.copy()
+                params = signature(fn).parameters
+                print(f'{name} params: {params} for fn {fn}')
+                if 'name' in params:
+                    print(f'{name} adding name {name} to {fn}')
+                    kw['name'] = name
+
+                has_kwargs = Kind.VAR_KEYWORD in [ param.kind for param in params.values() ]
+
+                def wrapped(self, path, name, **_kw):
+                    if cache_key in params or has_kwargs:
+                        print(f'{name} adding {cache_key} to {fn}')
+                        kw[cache_key] = getattr(self, cache_key)
+                    if 'path' in params or has_kwargs:
+                        print(f'{name} adding path {path} to {fn}')
+                        kw['path'] = path
+                    if 'self' in params:
+                        print(f'{name} adding self {self} to {fn}')
+                        kw['self'] = self
+
+                    print(f'{name}: calling {fn} with {kw}')
+                    return fn(**_kw, **kw)
+
+                return partial(wrapped, name=name)
+
+            bind = partial(_bind, name=name)
+            print(f'{name}: bind {bind} {signature(bind).parameters}')
+
             if isinstance(member, Field):
                 field = member
                 print(f'field: {name} -> {field}')
                 fields.append(name)
-                field_name = f'_{name}'
+                _name = f'_{name}'
 
                 # If the class provides a default loader, use its load/save methods on fields that didn't explicitly set
                 # their own
                 _loader = field.loader
+                _loader = Loader(_loader.load, _loader.save)
                 if loader and field.default_load: _loader.load = loader.load
                 if loader and field.default_save: _loader.save = loader.save
 
@@ -101,7 +133,7 @@ class Meta(type):
                     :return: the value of this `Field` on the `self` class instance (whether loaded from cache or
                              computed + saved to cache)
                     '''
-                    print(f'wrapped_fn: {name} ({_name}): {field}')
+                    print(f'wrapped_fn: {name} ({_name}): field {field} loader {loader}')
                     if not hasattr(self, _name):
                         # This field's value hasn't been loaded or computed on this instance yet
 
@@ -112,13 +144,15 @@ class Meta(type):
                         path = cache_dir / name
 
                         # Misc kwargs passed to the serialization layer, to enable various customizations
-                        kw = {}
-                        kw[cache_key] = getattr(self, cache_key)
-                        kw['name'] = name
+                        # kw = {}
+                        # kw[cache_key] = getattr(self, cache_key)
+                        # kw['name'] = name
 
                         if path.exists():
                             # Load from cache
-                            val = loader.load(path, **kw)
+                            load = bind(loader.load)
+                            val = load(self, path)
+                            #val = loader.load(path, **kw)
                             print(f'Loaded attr from cache: {_name}={val}')
                         else:
                             print(f'Computing: {name}')
@@ -130,7 +164,11 @@ class Meta(type):
                             cache_dir.mkdir(parents=True, exist_ok=True)
 
                             print(f'Saving {name} to {path}')
-                            loader.save(path, val, **kw)
+                            save = loader.save
+                            if save:
+                                save = bind(save)
+                                save(self, path, val=val)
+                            # if save: loader.save(path, val, **kw)
 
                         # set loaded/computed value on `self` instance
                         setattr(self, _name, val)
@@ -140,7 +178,81 @@ class Meta(type):
                     return getattr(self, _name)
 
                 # Partially apply all relevant fields (ensures closures are bound properly)
-                applied = partial(wrapped_fn, name=name, field_name=field_name, field=field, loader=_loader)
+                applied = partial(wrapped_fn, name=name, _name=_name, field=field, loader=_loader)
+
+                # A `@property` is ultimately returned, for parend-less call-site syntactic-sugar
+                prop = property(applied)
+
+                # Store the modified field getter on the class' definition
+                print(f'Setting method: {name}: {prop}')
+                methods[name] = prop
+            elif isinstance(member, DirectField):
+                field = member
+                print(f'field: {name} -> {field}')
+                fields.append(name)
+                _name = f'_{name}'
+
+                # If the class provides a default loader, use its load/save methods on fields that didn't explicitly set
+                # their own
+                # _loader = field.loader
+                # _loader = Loader(_loader.load, _loader.save)
+                # if loader and field.default_load: _loader.load = loader.load
+                # if loader and field.default_save: _loader.save = loader.save
+
+                def wrapped_fn(self, name, _name, field):
+                    '''Synthetic "getter" for a `Field` member of a class.
+
+                    Replaces the user-provided getter (`field.compute`), wrapping it in caching/persistence logic.
+
+                    :param self: class instance containing fields to cache
+                    :param name: name of the `Field` being instrumented
+                    :param _name: slot in which to store the computed value of this field (when present; typically just
+                                  the field's `name` with an underscore prefixed)
+                    :param field: `Field` instance being instrumented
+                    :return: the value of this `Field` on the `self` class instance (whether loaded from cache or
+                             computed + saved to cache)
+                    '''
+                    print(f'wrapped_fn: {name} ({_name}): field {field}')
+                    if not hasattr(self, _name):
+                        # This field's value hasn't been loaded or computed on this instance yet
+
+                        # Path to cache this instance's fields to
+                        cache_dir = getattr(self, cache_dir_key)
+
+                        # Path to cache this specific field to (within the instance's dir)
+                        path = cache_dir / name
+
+                        # Misc kwargs passed to the serialization layer, to enable various customizations
+                        # kw = {}
+                        # kw[cache_key] = getattr(self, cache_key)
+                        # kw['name'] = name
+
+                        if not path.exists():
+                            print(f'Downloading: {name}')
+
+                            cache_dir.mkdir(parents=True, exist_ok=True)
+
+                            # Compute the field's value
+                            download = bind(field.download)
+                            download(self, path)
+                            # field.download(self, path, **kw)
+                            print(f'Downloaded to {path}')
+
+                        # Load from cache
+                        parse = bind(field.parse)
+                        val = parse(self, path)
+                        # val = field.parse(path, **kw)
+                        print(f'Loaded attr from cache: {_name}={val}')
+
+                        # set loaded/computed value on `self` instance
+                        setattr(self, _name, val)
+                    else:
+                        print(f'Lookup: {name}={getattr(self, _name)}')
+
+                    return getattr(self, _name)
+
+                # Partially apply all relevant fields (ensures closures are bound properly)
+                applied = partial(wrapped_fn, name=name, _name=_name, field=field)
 
                 # A `@property` is ultimately returned, for parend-less call-site syntactic-sugar
                 prop = property(applied)

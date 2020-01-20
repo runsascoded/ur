@@ -25,6 +25,13 @@ class JSONLoader(Loader):
             json.dump(val, f)
 
     def __init__(self):
-        super(Loader, self).__init__(self, self._load, self._save)
+        super(JSONLoader, self).__init__(self._load, self._save)
 
 JSON = JSONLoader()
+
+noop = lambda path, val, **_: None
+
+def load_xml(path, **_):
+    from lxml.etree import fromstring, XMLParser
+    parser = XMLParser(recover=True)
+    return fromstring(path.read_text(), parser)

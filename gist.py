@@ -3,7 +3,8 @@ from tempfile import NamedTemporaryFile
 from urllib.request import urlretrieve
 
 from pclass.dircache import Meta
-from pclass.field import field
+from pclass.field import field, directfield
+from pclass.loader import load_xml
 from git import Repo
 
 from gist_url import GistURL
@@ -27,7 +28,8 @@ class File:
 
     @property
     def url(self):
-        return f'https://gist.githubusercontent.com/{self.gist.user}/{self.gist.id}/raw/{self.name}'
+        gist = self.gist
+        return f'https://gist.githubusercontent.com/{gist.user}/{gist.id}/raw/{self.name}'
 
     @property
     def web_url(self):
@@ -35,7 +37,7 @@ class File:
         return f'https://gist.github.com/{gist.user}/{gist.id}#{gist.fragments[self.name]}'
 
 
-class Gist(metaclass=Meta):
+class Gist(metaclass=Meta, debug=print):
 
     @property
     def git_url(self):
@@ -51,28 +53,25 @@ class Gist(metaclass=Meta):
         [ author_link ] = root.cssselect('.author > a')
         return author_link.text
 
-    @field
-    def xml(self):
+    @directfield
+    def xml(self, path):
+        urlretrieve(self.url, path)
+
+    @xml.load
+    def load_xml(self, path, **_):
         from lxml.etree import fromstring, XMLParser
         parser = XMLParser(recover=True)
-        with NamedTemporaryFile() as f:
-            urlretrieve(self.url, f.name)
-            return fromstring(f.read(), parser)
+        return fromstring(path.read_text(), parser)
 
     @field
     def author(self):
         return self.clone.active_branch.commit.author.email
 
-    @field(
-        load=lambda path, **_: Repo(path),
-        save=lambda path, repo, **_: None
-    )
-    def clone(self):
+    @directfield(parse=lambda path, **_: Repo(path))
+    def clone(self, path):
         url = self.git_url
-        dest = self.cloned_dir
-        print(f'Cloning {url} into {dest}')
-        check_call([ 'git', 'clone', url, str(dest) ])
-        return Repo(dest)
+        print(f'Cloning {url} into {path}')
+        check_call([ 'git', 'clone', url, str(path) ])
 
     @property
     def cloned_dir(self):

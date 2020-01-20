@@ -80,7 +80,7 @@ class Importer:
         print(f'exec_module {mod}')
         spec = mod.__spec__
 
-        if spec.is_package:
+        if spec.submodule_search_locations:
             gist = spec._gist
             for file in gist.files:
                 basename = file.name

@@ -1,10 +1,8 @@
 from subprocess import check_call
-from tempfile import NamedTemporaryFile
 from urllib.request import urlretrieve
 
 from pclass.dircache import Meta
 from pclass.field import field, directfield
-from pclass.loader import load_xml
 from git import Repo
 
 from gist_url import GistURL
@@ -37,7 +35,7 @@ class File:
         return f'https://gist.github.com/{gist.user}/{gist.id}#{gist.fragments[self.name]}'
 
 
-class Gist(metaclass=Meta, debug=print):
+class Gist(metaclass=Meta):
 
     @property
     def git_url(self):
@@ -58,7 +56,7 @@ class Gist(metaclass=Meta, debug=print):
         urlretrieve(self.url, path)
 
     @xml.load
-    def load_xml(self, path, **_):
+    def load_xml(self, path):
         from lxml.etree import fromstring, XMLParser
         parser = XMLParser(recover=True)
         return fromstring(path.read_text(), parser)
@@ -67,7 +65,7 @@ class Gist(metaclass=Meta, debug=print):
     def author(self):
         return self.clone.active_branch.commit.author.email
 
-    @directfield(parse=lambda path, **_: Repo(path))
+    @directfield(parse=Repo)
     def clone(self, path):
         url = self.git_url
         print(f'Cloning {url} into {path}')

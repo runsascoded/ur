@@ -9,25 +9,25 @@ file_chars = '[A-Za-z0-9_\-\.]+'
 chars = '[A-Za-z0-9_\-]+'
 hexs = '[a-f0-9]+'
 
-user_re = maybe(f'(?P<user>{chars})')
+user_re = f'/(?P<user>{chars})'
 id_re = f'(?P<id>{hexs})'
 raw_re = f'(?P<raw>raw)'
 tree_re = maybe(f'(?P<tree>{hexs})')
 file_re = maybe(f'(?P<file>{file_chars})')
 fragment_re = maybe(f'(?P<fragment>{chars})')
 
-full_raw_url_path = f'^/{user_re}/{id_re}/{raw_re}/{tree_re}/{file_re}$'
-
-regexs = [
-    f'^/{user_re}/{id_re}$',
-    f'^/{user_re}/{id_re}#{fragment_re}$',
-    f'^/{user_re}/{id_re}/{tree_re}$',
-    f'^/{user_re}/{id_re}/{tree_re}#{fragment_re}$',
-    f'^/{user_re}/{id_re}/{raw_re}$',
-    f'^/{user_re}/{id_re}/{raw_re}/{file_re}$',
-    f'^/{user_re}/{id_re}/{raw_re}/{tree_re}$',
-    full_raw_url_path,
+GIST_URL_PATH_REGEXS = [
+    f'^{maybe(user_re)}/{id_re}$',                          # www:    whole gist,    current HEAD
+    f'^{maybe(user_re)}/{id_re}#{fragment_re}$',            # www: specific file,    current HEAD
+    f'^{maybe(user_re)}/{id_re}/{tree_re}$',                # www:    whole gist, specific commit
+    f'^{maybe(user_re)}/{id_re}/{tree_re}#{fragment_re}$',  # www: specific file, specific commit
+    f'^{user_re}/{id_re}/{raw_re}$',                       # raw:    first file,    current HEAD
+    f'^{user_re}/{id_re}/{raw_re}/{file_re}$',             # raw: specific file,    current HEAD
+    f'^{user_re}/{id_re}/{raw_re}/{tree_re}$',             # raw:    first file, specific commit
+    f'^{user_re}/{id_re}/{raw_re}/{tree_re}/{file_re}$',   # raw: specific file, specific commit
 ]
+
+full_raw_url_path = GIST_URL_PATH_REGEXS[-1]
 
 class GistURL(NamedTuple):
     id: str
@@ -79,14 +79,14 @@ class GistURL(NamedTuple):
 
     @classmethod
     def from_url_path(cls, path, fragment=None):
-        matches = [ (match(regex, path), regex) for regex in regexs ]
+        matches = [(match(regex, path), regex) for regex in GIST_URL_PATH_REGEXS]
         matches = [ (m.groupdict(), regex) for m, regex in matches if m ]
         if not matches:
-            raise Exception(f'Failed to parse gist.github.com URL: {path}')
+            raise Exception(f'Failed to parse gist.github.com URL path: {path}')
         num_matches = len(matches)
         if num_matches > 1:
             raise Exception(
-                f'Ambiguous parse of gist.github.com URL {path}:\n%s' % (
+                f'Ambiguous parse of gist.github.com URL path: {path}\n%s' % (
                     '\n\t'.join([
                         str(m)
                         for m, _ in matches

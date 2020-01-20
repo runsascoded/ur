@@ -1,8 +1,9 @@
 import ast
-import sys
 from inspect import stack
 from io import BytesIO
+from pathlib import Path
 from re import match
+import sys
 from types import ModuleType
 from urllib.parse import urlparse
 
@@ -31,6 +32,7 @@ class URLLoader:
         all=False,
         **kwargs,
     ):
+        print(f'URLLoader.main({self}, path={path}, names={names}, all={all}, **{kwargs}')
         gist = kwargs.get('gist')
         github = kwargs.get('github')
         gitlab = kwargs.get('gitlab')
@@ -163,7 +165,8 @@ class URLLoader:
         update = { name: mod_dict[name] for name in members }
         stk = stack()
         cur_file = stk[0].filename
-        frame_info = next(frame for frame in stk if frame.filename != cur_file)
+        cur_dir = Path(cur_file).parent
+        frame_info = next(frame for frame in stk if Path(frame.filename).parent != cur_dir)
         frame_info.frame.f_globals.update(update)
         return mod
 

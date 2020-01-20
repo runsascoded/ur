@@ -1,5 +1,28 @@
-# nbimporter
-Import IPython Notebooks as modules (with Jupyter v4).
+# ur
+import remote Python and Jupyter notebook files, from GitHub Gists, the local filesystem, or arbitrary URLs.
+
+
+## Install:
+```
+from sys import executable as python
+!{python} -m pip install ur
+```
+
+## Import GitHub gists
+```python
+from gists._1288bff2f9e05394a94312010da267bb import *
+a_b.a(), a_b.b(), c.c()
+# ('aaa', 'bbb', 'ccc')
+```
+
+That imports 2 Jupyter notebooks from https://gist.github.com/1288bff2f9e05394a94312010da267bb (note the leading underscore in the `import` statement, which is necessary when the Gist ID begins with a number), and calls functions defined in them.
+
+## Import arbitrary URLs
+```python
+a_b = ur('https://gist.githubusercontent.com/ryan-williams/1288bff2f9e05394a94312010da267bb/raw/0a2b5966c22c5461734063b78239262e39e4f363/a_b.ipynb')
+a_b.a(), a_b.b()
+```
+
 
 ## Update 2019-06: I do not recommend any more to use *nbimporter*.
 When I created this package some years ago, I still believed that importing 

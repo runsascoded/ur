@@ -3,6 +3,8 @@ from importlib._bootstrap import spec_from_loader
 from IPython.core.interactiveshell import InteractiveShell
 from IPython import get_ipython
 import nbformat
+from os import environ as env
+from pathlib import Path
 import sys
 from types import ModuleType
 
@@ -16,11 +18,24 @@ class Importer:
     '''Importer providing a synthetic "gists" top-level package that allows importing `.py` and `.ipynb` files from
     GitHub Gists.'''
 
-    def __init__(self):
+    DEBUG_ENV_VAR = 'UR_DEBUG'
+
+    def __init__(self, **kw):
         self.shell = InteractiveShell.instance()
 
+        if 'debug' in kw:
+            self._print = kw['debug']
+        elif self.DEBUG_ENV_VAR in env and env[self.DEBUG_ENV_VAR]:
+            self._print = print
+        else:
+            self._print = None
+
+    def print(self, *args, **kwargs):
+        if self._print:
+            self._print(*args, **kwargs)
+
     def find_spec(self, fullname, path=None, target=None):
-        print(f'find_spec: {fullname} {path} {target}')
+        self.print(f'find_spec: {fullname} {path} {target}')
         path = fullname.split('.')
         if path[0] != 'gists':
             return
@@ -30,7 +45,7 @@ class Importer:
         path = path[2:]
         gist = Gist(id)
 
-        print(f'Building module/pkg for gist {gist} ({path}; {target})')
+        self.print(f'Building module/pkg for gist {gist} ({path}; {target})')
 
         if len(path) > 1:
             raise Exception(f'Too many path components for gist {id}: {path}')
@@ -50,8 +65,8 @@ class Importer:
             file = None
             is_package = True
 
-        print(f'Creating package spec from {url} ({origin})')
-        spec = spec_from_loader(fullname, self, origin=origin, is_package=is_package)
+        self.print(f'Creating package spec from {url} ({origin})')
+        spec = spec_from_loader(fullname, self, origin=str(origin), is_package=is_package)
         spec.__license__ = "CC BY-SA 3.0"
         spec.__author__ = gist.author
         spec._gist = gist
@@ -64,20 +79,20 @@ class Importer:
 
     def create_module(self, spec):
         """Create a built-in module"""
-        print(f'create_module {spec}')
+        self.print(f'create_module {spec}')
         mod = ModuleType(spec.name)
         mod.__file__ = spec.origin
         mod.__loader__ = self
         mod.__dict__['get_ipython'] = get_ipython
         mod.__spec__ = spec
 
-        print(f'Installing module {spec.name}: {mod}')
+        self.print(f'Installing module {spec.name}: {mod}')
         sys.modules[spec.name] = mod
         return mod
 
     def exec_module(self, mod=None):
         """Exec a built-in module"""
-        print(f'exec_module {mod}')
+        self.print(f'exec_module {mod}')
         spec = mod.__spec__
 
         if spec.submodule_search_locations:
@@ -89,23 +104,23 @@ class Importer:
                 fullname = f'{spec.name}.{module_name}'
                 file_spec = self.find_spec(fullname)
                 if file_spec:
-                    print(f'Found spec for child module {module_name} ({fullname})')
+                    self.print(f'Found spec for child module {module_name} ({fullname})')
                     file_mod = self.create_module(file_spec)
                     self.exec_module(file_mod)
                     mod.__dict__[module_name] = file_mod
         else:
-            print(f'Attempt to exec module {spec}')
+            self.print(f'Attempt to exec module {spec}')
 
-            path = spec.origin
+            path = Path(spec.origin)
             if path.name.endswith('.py'):
-                print(f'exec py: {path}')
+                self.print(f'exec py: {path}')
                 code = path.read_text()
                 try:
                     exec(code, mod.__dict__)
                 except:
-                    print(f'Error executing module {mod} ({path}\n{code}')
+                    self.print(f'Error executing module {mod} ({path}\n{code}')
             elif path.name.endswith('.ipynb'):
-                print(f'exec notebook: {path}')
+                self.print(f'exec notebook: {path}')
                 # load the notebook
                 nb_version = nbformat.version_info[0]
                 with open(path, 'r', encoding=options['encoding']) as f:
@@ -113,7 +128,7 @@ class Importer:
 
                 # Only do something if it's a python notebook
                 if nb.metadata.kernelspec.language != 'python':
-                    print("Ignoring '%s': not a python notebook." % path)
+                    self.print("Ignoring '%s': not a python notebook." % path)
                     return mod
 
                 # extra work to ensure that magics that would affect the user_ns

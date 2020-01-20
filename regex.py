@@ -1,2 +1,2 @@
 def maybe(re):
-    return f'(?:{re})'
+    return f'(?:{re})?'

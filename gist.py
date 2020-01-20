@@ -1,42 +1,111 @@
-from re import match
+from subprocess import check_call
+from tempfile import NamedTemporaryFile
+from urllib.request import urlretrieve
 
-from regex import maybe
-from gist_url import GistURL, chars
+from pclass.dircache import Meta
+from pclass.field import field
+from git import Repo
 
-class Gist:
+from gist_url import GistURL
 
-    def __init__(self, id, user=None):
-        self.id = id
-        self.user = user
 
-    @classmethod
-    def from_url(cls, url):
-        maybe_user = maybe(f'(?P<user>{chars})/')
-        id_re = f'(?P<id>{chars})'
-        m = match(gist, f'^{maybe_user}{id_re}$')
-        if not m:
-            raise Exception(f'Unrecognized gist: {gist}')
+class File:
+    def __init__(self, gist, path):
+        self.gist = gist
+        self.name = path.name
+        self.path = path
 
-        user = m.group('user')
-        id = m.group('id')
+    def __str__(self):
+        return self.name
 
-        kwargs_gist_url = GistURL(id=id, user=user)
+    def __repr__(self):
+        return self.name
 
-        gist_url = GistURL.from_url_path(url.path, url.fragment)
-        print(f'gist_url: {gist_url}')
-        if kwargs_gist_url:
-            gist_url = gist_url.merge(kwargs_gist_url)
-            print(f'updated gist_url: {gist_url}')
+    @property
+    def module_name(self):
+        return self.name.rpartition('.')[0]
 
-        raw_urls = gist_url.raw_urls()
-        print(f'raw_urls: {raw_urls}')
-        if not raw_urls:
-            raise Exception(f'No raw URLs found for gist {gist_url.url}')
+    @property
+    def url(self):
+        return f'https://gist.githubusercontent.com/{self.gist.user}/{self.gist.id}/raw/{self.name}'
 
-        if len(raw_urls) > 1:
-            raise NotImplementedError('Importing gists with multiple notebooks not supported… yet!')
+    @property
+    def web_url(self):
+        gist = self.gist
+        return f'https://gist.github.com/{gist.user}/{gist.id}#{gist.fragments[self.name]}'
 
-        [ raw_url ] = raw_urls
-        # Pass through to the rest of the function
-        path = raw_url
-        print(f'fwding on {raw_url}: {path}')
+
+class Gist(metaclass=Meta):
+
+    @property
+    def git_url(self):
+        return f'git@gist.github.com:{self.id}.git'
+
+    @field
+    def url(self):
+        return f'https://gist.github.com/{self.id}'
+
+    @field
+    def user(self):
+        root = self.xml
+        [ author_link ] = root.cssselect('.author > a')
+        return author_link.text
+
+    @field
+    def xml(self):
+        from lxml.etree import fromstring, XMLParser
+        parser = XMLParser(recover=True)
+        with NamedTemporaryFile() as f:
+            urlretrieve(self.url, f.name)
+            return fromstring(f.read(), parser)
+
+    @field
+    def author(self):
+        return self.clone.active_branch.commit.author.email
+
+    @field(
+        load=lambda path, **_: Repo(path),
+        save=lambda path, repo, **_: None
+    )
+    def clone(self):
+        url = self.git_url
+        dest = self.cloned_dir
+        print(f'Cloning {url} into {dest}')
+        check_call([ 'git', 'clone', url, str(dest) ])
+        return Repo(dest)
+
+    @property
+    def cloned_dir(self):
+        return self._dir / 'clone'
+
+    @property
+    def files(self):
+        return [ File(self, file) for file in self.cloned_dir.iterdir() ]
+
+    @property
+    def files_dict(self):
+        return { file.name: file for file in self.files }
+
+    @property
+    def file_bases_dict(self):
+        return { file.module_name: file for file in self.files }
+
+    @field
+    def fragments(self):
+        root = self.xml
+        file_elems = root.cssselect('.file')
+        fragments = {}
+        for f in file_elems:
+            [ raw_a ] = f.xpath('.//a[contains(., "Raw")]')
+            raw_url_path = raw_a.attrib['href']
+            gist_url = GistURL.from_full_raw_url_path(raw_url_path)
+
+            [ link ] = f.cssselect('.file-info > .css-truncate')
+            fragment = link.attrib['href']
+            if not fragment.startswith('#'):
+                raise Exception(f'Expected file header for {gist_url.file} to be an intra-page fragment link; found {fragment}')
+            fragment = fragment[1:]
+
+            fragments[gist_url.file] = fragment
+
+        return fragments

@@ -1,28 +1,22 @@
 import ast
-import nbformat
-from types import ModuleType
-from IPython.core.interactiveshell import InteractiveShell
-
-from IPython import get_ipython
-
-options = {'only_defs': True, 'run_nbinit': True, 'encoding': 'utf-8'}
-
-from nbimporter.nbimporter import CellDeleter
-
-import sys
 from importlib._bootstrap import spec_from_loader
+from IPython.core.interactiveshell import InteractiveShell
+from IPython import get_ipython
+import nbformat
+import sys
+from types import ModuleType
 
-from gist_cache import Gist
+from cells import CellDeleter
+from gist import Gist
 
-class GistImporter:
-    """
-    `from stackoverflow import quick_sort` will go through the search results
-    of `[python] quick sort` looking for the largest code block that doesn't
-    syntax error in the highest voted answer from the highest voted question
-    and return it as a module, or raise ImportError if there's no code at all.
-    """
+options = { 'only_defs': True, 'encoding': 'utf-8' }
 
-    def __init__(self, path=None):
+
+class Importer:
+    '''Importer providing a synthetic "gists" top-level package that allows importing `.py` and `.ipynb` files from
+    GitHub Gists.'''
+
+    def __init__(self):
         self.shell = InteractiveShell.instance()
 
     def find_spec(self, fullname, path=None, target=None):
@@ -35,39 +29,38 @@ class GistImporter:
             id = id[1:]
         path = path[2:]
         gist = Gist(id)
-        url = gist.url
 
         print(f'Building module/pkg for gist {gist} ({path}; {target})')
 
         if len(path) > 1:
             raise Exception(f'Too many path components for gist {id}: {path}')
 
-        file = None
         if path:
-            [ file ] = path
-
-        if file:
-            print(f'Creating module spec from file {file}')
-            spec = spec_from_loader(fullname, self, origin=file, is_package=False)
-            spec.__license__ = "CC BY-SA 3.0"
-            spec._url = url
+            [ filename ] = path
             files = gist.file_bases_dict
-            if file not in files:
-                raise Exception(f'File {file} not found in gist {gist} (files: {gist.files})')
-            path = files[file].path
-            spec.__author__ = gist.author
-            spec._path = path
-            spec._gist = gist
-            return spec
+            if filename not in files:
+                raise Exception(f'File {filename} not found in gist {gist} (files: {gist.files})')
+            file = files[filename]
+            origin = file.path
+            url = file.url
+            is_package = False
         else:
-            print(f'Creating package spec from url {url} ({gist.cloned_dir})')
-            spec = spec_from_loader(fullname, self, origin=url, is_package=True)
+            origin = gist.cloned_dir
+            url = gist.url
+            file = None
+            is_package = True
+
+        print(f'Creating package spec from {url} ({origin})')
+        spec = spec_from_loader(fullname, self, origin=origin, is_package=is_package)
+        spec.__license__ = "CC BY-SA 3.0"
+        spec.__author__ = gist.author
+        spec._gist = gist
+        spec._url = url
+
+        if is_package:
             spec.submodule_search_locations = [ str(gist.cloned_dir) ]
-            spec.__license__ = "CC BY-SA 3.0"
-            spec._url = url
-            spec.__author__ = gist.author
-            spec._gist = gist
-            return spec
+
+        return spec
 
     def create_module(self, spec):
         """Create a built-in module"""
@@ -87,38 +80,34 @@ class GistImporter:
         print(f'exec_module {mod}')
         spec = mod.__spec__
 
-        if spec.submodule_search_locations:
+        if spec.is_package:
             gist = spec._gist
             for file in gist.files:
                 basename = file.name
-                if basename == '.git':
-                    continue
-                name = basename.rpartition('.')[0]
-                fullname = f'{mod.__name__}.{name}'
+                if basename == '.git': continue
+                module_name = file.module_name
+                fullname = f'{spec.name}.{module_name}'
                 file_spec = self.find_spec(fullname)
                 if file_spec:
-                    print(f'Found spec for child module {name} ({fullname})')
+                    print(f'Found spec for child module {module_name} ({fullname})')
                     file_mod = self.create_module(file_spec)
-                    file_spec.loader.exec_module(file_mod)
-                    # if self.exec_module(file_mod):
-                    mod.__dict__[name] = file_mod
+                    self.exec_module(file_mod)
+                    mod.__dict__[module_name] = file_mod
         else:
             print(f'Attempt to exec module {spec}')
 
-            path = spec._path
+            path = spec.origin
             if path.name.endswith('.py'):
                 print(f'exec py: {path}')
                 code = path.read_text()
                 try:
                     exec(code, mod.__dict__)
-                    return True
                 except:
                     print(f'Error executing module {mod} ({path}\n{code}')
             elif path.name.endswith('.ipynb'):
                 print(f'exec notebook: {path}')
-                # load the notebook object
+                # load the notebook
                 nb_version = nbformat.version_info[0]
-
                 with open(path, 'r', encoding=options['encoding']) as f:
                     nb = nbformat.read(f, nb_version)
 
@@ -148,14 +137,5 @@ class GistImporter:
                 finally:
                     self.shell.user_ns = save_user_ns
 
-                # Run any initialisation if available, but only once
-                # if options['run_nbinit'] and '__nbinit_done__' not in mod.__dict__:
-                #     try:
-                #         mod.__nbinit__()
-                #         mod.__nbinit_done__ = True
-                #     except (KeyError, AttributeError) as _:
-                #         pass
 
-                # return mod
-
-sys.meta_path.append(GistImporter())
+sys.meta_path.append(Importer())

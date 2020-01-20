@@ -45,7 +45,7 @@ class Importer:
             url = file.url
             is_package = False
         else:
-            origin = gist.cloned_dir
+            origin = gist.clone_dir
             url = gist.url
             file = None
             is_package = True
@@ -58,7 +58,7 @@ class Importer:
         spec._url = url
 
         if is_package:
-            spec.submodule_search_locations = [ str(gist.cloned_dir) ]
+            spec.submodule_search_locations = [str(gist.clone_dir)]
 
         return spec
 

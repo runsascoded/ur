@@ -1,3 +1,4 @@
+from pathlib import Path
 from subprocess import check_call
 from urllib.request import urlretrieve
 
@@ -41,7 +42,7 @@ class Gist(metaclass=Meta):
     def git_url(self):
         return f'git@gist.github.com:{self.id}.git'
 
-    @field
+    @property
     def url(self):
         return f'https://gist.github.com/{self.id}'
 
@@ -72,12 +73,12 @@ class Gist(metaclass=Meta):
         check_call([ 'git', 'clone', url, str(path) ])
 
     @property
-    def cloned_dir(self):
-        return self._dir / 'clone'
+    def clone_dir(self):
+        return Path(self.clone.git_dir).parent
 
     @property
     def files(self):
-        return [ File(self, file) for file in self.cloned_dir.iterdir() ]
+        return [File(self, file) for file in self.clone_dir.iterdir()]
 
     @property
     def files_dict(self):

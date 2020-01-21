@@ -150,3 +150,5 @@ from gists.abcdef0123456789abcdef0123456789 import *
 - test/handle pip dependencies in gist imports
 - support github / gitlab imports
 - API for tagging/skipping cells in notebooks (visualizations, tests, etc.)
+- Support Jupyter versions >4
+- Minimize(+freeze!) [dependencies](./setup.py)

@@ -62,6 +62,6 @@ sys.modules[__name__] = UrModule(sys.modules[__name__])
 
 
 _loader = URLLoader()
-def main(path, *names):
-    ret = _loader.main(path, *names)
+def main(*args, **kwargs):
+    ret = _loader.main(*args, **kwargs)
     return ret

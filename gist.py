@@ -166,7 +166,6 @@ class Gist(metaclass=Meta):
             return None
 
         domain = u.netloc
-        print(f'domain: {domain}')
         if domain == 'gist.github.com':
             raw = None
         elif domain == 'gist.githubusercontent.com':
@@ -194,7 +193,11 @@ class Gist(metaclass=Meta):
         else:
             raise Exception(f'Unrecognized "raw" value: {raw}')
 
-        return one(regexs, path, throw=throw)
+        m = one(regexs, path, throw=throw)
+        if not m: return None
+
+        if fragment: m['fragment'] = fragment
+        return m
 
     @classmethod
     def from_url_path(cls, path, raw=None, fragment=None, throw=True):

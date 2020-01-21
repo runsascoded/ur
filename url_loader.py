@@ -17,6 +17,7 @@ from regex import maybe
 
 
 def merge(l, r, *keys):
+    l = l or {}
     n = l.copy()
     if not keys:
         keys = r.keys()
@@ -38,6 +39,11 @@ class URLLoader:
     def __init__(self, path=None):
         self.shell = InteractiveShell.instance()
         self.path = path
+        self._print = None
+
+    def print(self, *args, **kwargs):
+        if self._print:
+            self._print(*args, **kwargs)
 
     def main(
         self,
@@ -49,16 +55,14 @@ class URLLoader:
         all=False,
         **kwargs,
     ):
-        print(f'URLLoader.main({self}, path={path}, names={names}, all={all}, **{kwargs}')
+        self.print(f'URLLoader.main({self}, path={path}, names={names}, all={all}, **{kwargs}')
         gist = kwargs.get('gist')
         github = kwargs.get('github')
         gitlab = kwargs.get('gitlab')
-        #commit = kwargs.get('commit')
         pkg = kwargs.get('pkg')
-        #file = kwargs.get('file')
 
         url = urlparse(path)
-        if url.scheme:
+        if url.scheme or gist or github or gitlab:
             domain = url.netloc
             gist_attrs = Gist.parse_url(path, throw=False)
             if gist_attrs or gist:
@@ -70,32 +74,34 @@ class URLLoader:
                 if gist:
                     maybe_user = maybe(f'(?P<user>{chars})/')
                     id_re = f'(?P<id>{chars})'
-                    m = match(gist, f'^{maybe_user}{id_re}$')
-                    if not m:
-                        raise Exception(f'Unrecognized gist: {gist}')
+                    m = match(f'^{maybe_user}{id_re}$', gist)
+                    if not m: raise Exception(f'Unrecognized gist: {gist}')
 
                     user = m.group('user')
                     id = m.group('id')
 
                     gist_attrs = merge(gist_attrs, dict(id=id, user=user))
 
+                self.print(f'gist_attrs: {gist_attrs}')
                 obj = Gist.from_dict(**gist_attrs)
                 if isinstance(obj, Commit):
                     commit = obj
+                    self.print(f'Parsed commit: {commit}')
                     gist = commit.gist
                     name = gist.module_name
                 elif isinstance(obj, File):
                     file = obj
                     commit = file.commit
+                    self.print(f'Parsed commit: {commit} (file {file})')
                     name = file.module_fullname
                 else:
                     raise Exception(f'Unrecognized gist object: {obj}')
 
                 if name in sys.modules:
                     mod = sys.modules[name]
-                    print(f'Found loaded gist module: {mod}')
+                    self.print(f'Found loaded gist module: {mod}')
                 else:
-                    print(f'Loading gist module {name} (commit {commit})')
+                    self.print(f'Loading gist module {name} (commit {commit})')
                     spec = importer.find_spec(name, commit=commit)
                     if not spec:
                         raise Exception(f'Failed to find spec for {name} (commit {commit})')
@@ -153,7 +159,7 @@ class URLLoader:
                     mod.__nbinit__()
                     mod.__nbinit_done__ = True
 
-        if not names: return mod
+        if not names and not all: return mod
 
         mod_dict = mod.__dict__
 
@@ -162,7 +168,7 @@ class URLLoader:
         else:
             members = [ name for name in mod_dict if not name.startswith('_') ]
 
-        import_all = '*' in names
+        import_all = '*' in names or all is True or all == '*'
         if import_all:
             names = [ name for name in names if not name == '*' ]
 
@@ -173,11 +179,13 @@ class URLLoader:
         if not import_all:
             members = names
 
+        self.print(f'Bubbling up {members}')
         update = { name: mod_dict[name] for name in members }
         stk = stack()
         cur_file = stk[0].filename
         cur_dir = Path(cur_file).parent
         frame_info = next(frame for frame in stk if Path(frame.filename).parent != cur_dir)
+        self.print(f'Frame: {frame_info}, {frame_info.filename}')
         frame_info.frame.f_globals.update(update)
         return mod
 

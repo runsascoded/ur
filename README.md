@@ -152,3 +152,5 @@ from gists.abcdef0123456789abcdef0123456789 import *
 - API for tagging/skipping cells in notebooks (visualizations, tests, etc.)
 - Support Jupyter versions >4
 - Minimize(+freeze!) [dependencies](./setup.py)
+- proper logging
+- self-host (put code in notebooks in gists, implement subsequent versions of `ur` using earlier versions of `ur` to import from remote, package-less locations)

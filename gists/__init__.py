@@ -4,12 +4,11 @@ from IPython.core.interactiveshell import InteractiveShell
 from IPython import get_ipython
 import nbformat
 from os import environ as env
-from pathlib import Path
 import sys
 from types import ModuleType
 
 from cells import CellDeleter
-from gist import Gist
+from gist import Commit, Gist
 
 options = { 'only_defs': True, 'encoding': 'utf-8' }
 
@@ -34,46 +33,58 @@ class Importer:
         if self._print:
             self._print(*args, **kwargs)
 
-    def find_spec(self, fullname, path=None, target=None):
-        self.print(f'find_spec: {fullname} {path} {target}')
+    def find_spec(self, fullname, path=None, target=None, commit=None):
+        self.print(f'find_spec: {fullname} {path} {target} (commit? {commit})')
+
         path = fullname.split('.')
-        if path[0] != 'gists':
-            return
+        if path[0] != 'gists': return
+
         id = path[1]
         if id.startswith('_'):
             id = id[1:]
+
         path = path[2:]
-        gist = Gist(id)
-
-        self.print(f'Building module/pkg for gist {gist} ({path}; {target})')
-
         if len(path) > 1:
             raise Exception(f'Too many path components for gist {id}: {path}')
 
+        if isinstance(commit, Commit):
+            gist = commit.gist
+            url = commit.url
+        else:
+            gist = Gist(id)
+            url = gist.url
+            if isinstance(commit, str):
+                commit = Commit(commit, gist)
+            elif commit is None:
+                commit = gist.commit
+            else:
+                raise Exception(f'Invalid Gist commit value: {commit} (gist {gist})')
+
+        self.print(f'Building module/pkg for gist {commit} ({path}; {target})')
+
         if path:
             [ filename ] = path
-            files = gist.file_bases_dict
+            files = commit.file_bases_dict
             if filename not in files:
-                raise Exception(f'File {filename} not found in gist {gist} (files: {gist.files})')
+                raise Exception(f'File {filename} not found in gist {commit} (files: {commit.files})')
             file = files[filename]
-            origin = file.path
             url = file.url
             is_package = False
         else:
-            origin = gist.clone_dir
-            url = gist.url
             file = None
             is_package = True
 
+        origin = url
+
         self.print(f'Creating package spec from {url} ({origin})')
-        spec = spec_from_loader(fullname, self, origin=str(origin), is_package=is_package)
+        spec = spec_from_loader(fullname, self, origin=origin, is_package=is_package)
         spec.__license__ = "CC BY-SA 3.0"
-        spec.__author__ = gist.author
-        spec._gist = gist
-        spec._url = url
+        spec.__author__ = commit.author
+        spec._commit = commit
+        spec._file = file
 
         if is_package:
-            spec.submodule_search_locations = [str(gist.clone_dir)]
+            spec.submodule_search_locations = [ str(gist.clone_dir) ]
 
         return spec
 
@@ -91,50 +102,51 @@ class Importer:
         return mod
 
     def exec_module(self, mod=None):
-        """Exec a built-in module"""
+        """Exec a module"""
         self.print(f'exec_module {mod}')
         spec = mod.__spec__
+        self.exec(
+            name=spec.name,
+            commit=spec._commit,
+            dct=mod.__dict__ ,
+            file=spec._file,
+        )
 
-        if spec.submodule_search_locations:
-            gist = spec._gist
-            for file in gist.files:
-                basename = file.name
-                if basename == '.git': continue
+    def exec(self, name, commit, dct, file=None):
+        if not file:
+            for file in commit.files:
                 module_name = file.module_name
-                fullname = f'{spec.name}.{module_name}'
-                file_spec = self.find_spec(fullname)
+                fullname = f'{name}.{module_name}'
+                file_spec = self.find_spec(fullname, commit=commit.id)
                 if file_spec:
                     self.print(f'Found spec for child module {module_name} ({fullname})')
                     file_mod = self.create_module(file_spec)
                     self.exec_module(file_mod)
-                    mod.__dict__[module_name] = file_mod
+                    dct[module_name] = file_mod
         else:
-            self.print(f'Attempt to exec module {spec}')
-
-            path = Path(spec.origin)
-            if path.name.endswith('.py'):
-                self.print(f'exec py: {path}')
-                code = path.read_text()
+            self.print(f'Attempt to exec module {name}')
+            if file.name.endswith('.py'):
+                self.print(f'exec py: {file}')
+                code = file.read_text()
                 try:
-                    exec(code, mod.__dict__)
+                    exec(code, dct)
                 except:
-                    self.print(f'Error executing module {mod} ({path}\n{code}')
-            elif path.name.endswith('.ipynb'):
-                self.print(f'exec notebook: {path}')
+                    self.print(f'Error executing module {name} ({file}\n{code}')
+            elif file.name.endswith('.ipynb'):
+                self.print(f'exec notebook: {file}')
                 # load the notebook
                 nb_version = nbformat.version_info[0]
-                with open(path, 'r', encoding=options['encoding']) as f:
-                    nb = nbformat.read(f, nb_version)
+                nb = nbformat.read(file.data_stream, nb_version)
 
                 # Only do something if it's a python notebook
                 if nb.metadata.kernelspec.language != 'python':
-                    self.print("Ignoring '%s': not a python notebook." % path)
-                    return mod
+                    self.print("Ignoring '%s': not a python notebook." % file)
+                    return
 
                 # extra work to ensure that magics that would affect the user_ns
                 # actually affect the notebook module's ns
                 save_user_ns = self.shell.user_ns
-                self.shell.user_ns = mod.__dict__
+                self.shell.user_ns = dct
 
                 try:
                     deleter = CellDeleter()
@@ -147,10 +159,14 @@ class Importer:
                         else:
                             tree = ast.parse(code)
                         # run the code in the module
-                        codeobj = compile(tree, filename=path, mode='exec')
-                        exec(codeobj, mod.__dict__)
+                        codeobj = compile(tree, filename=file.url, mode='exec')
+                        exec(codeobj, dct)
                 finally:
                     self.shell.user_ns = save_user_ns
 
 
-sys.meta_path.append(Importer())
+importer = Importer()
+
+
+if not any([ isinstance(importer, Importer) for importer in sys.meta_path ]):
+    sys.meta_path.append(importer)

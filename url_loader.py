@@ -1,19 +1,36 @@
 import ast
+import sys
 from inspect import stack
-from io import BytesIO
 from pathlib import Path
 from re import match
-import sys
 from types import ModuleType
 from urllib.parse import urlparse
 
 import nbformat
 from IPython import get_ipython
 from IPython.core.interactiveshell import InteractiveShell
-from requests import get as GET
 
 from cells import CellDeleter
-from gist_url import GistURL, chars, maybe
+from gist import Commit, File, Gist, chars
+from gists import importer
+from regex import maybe
+
+
+def merge(l, r, *keys):
+    n = l.copy()
+    if not keys:
+        keys = r.keys()
+    for k in keys:
+        if not k in r:
+            continue
+        rv = r[k]
+        if k in l:
+            lv = l[k]
+            if lv != rv:
+                raise Exception(f'Conflicting elem: {k} -> ({lv}, {rv})')
+        else:
+            n[k] = rv
+    return n
 
 
 class URLLoader:
@@ -36,116 +53,110 @@ class URLLoader:
         gist = kwargs.get('gist')
         github = kwargs.get('github')
         gitlab = kwargs.get('gitlab')
-        tree = kwargs.get('tree')
+        #commit = kwargs.get('commit')
         pkg = kwargs.get('pkg')
-        file = kwargs.get('file')
+        #file = kwargs.get('file')
 
         url = urlparse(path)
         if url.scheme:
-            if match('^https?$', url.scheme):
-                domain = url.netloc
-                if domain == 'gist.github.com':
+            domain = url.netloc
+            gist_attrs = Gist.parse_url(path, throw=False)
+            if gist_attrs or gist:
+                assert not github
+                assert not gitlab
+                assert not pkg
 
-                    assert not gitlab
-                    assert not pkg
+                gist_attrs = merge(gist_attrs, kwargs, 'user', 'commit', 'file')
+                if gist:
+                    maybe_user = maybe(f'(?P<user>{chars})/')
+                    id_re = f'(?P<id>{chars})'
+                    m = match(gist, f'^{maybe_user}{id_re}$')
+                    if not m:
+                        raise Exception(f'Unrecognized gist: {gist}')
 
-                    kwargs_gist_url = None
-                    if gist:
-                        maybe_user = maybe(f'(?P<user>{chars})/')
-                        id_re = f'(?P<id>{chars})'
-                        m = match(gist, f'^{maybe_user}{id_re}$')
-                        if not m:
-                            raise Exception(f'Unrecognized gist: {gist}')
+                    user = m.group('user')
+                    id = m.group('id')
 
-                        user = m.group('user')
-                        id = m.group('id')
+                    gist_attrs = merge(gist_attrs, dict(id=id, user=user))
 
-                        kwargs_gist_url = GistURL(id=id, user=user, tree=tree, file=file)
-
-                    gist_url = GistURL.from_url_path(url.path, url.fragment)
-                    print(f'gist_url: {gist_url}')
-                    if kwargs_gist_url:
-                        gist_url = gist_url.merge(kwargs_gist_url)
-                        print(f'updated gist_url: {gist_url}')
-
-                    raw_urls = gist_url.raw_urls()
-                    print(f'raw_urls: {raw_urls}')
-                    if not raw_urls:
-                        raise Exception(f'No raw URLs found for gist {gist_url.url}')
-
-                    if len(raw_urls) > 1:
-                        raise NotImplementedError('Importing gists with multiple notebooks not supported… yet!')
-
-                    [ raw_url ] = raw_urls
-                    # Pass through to the rest of the function
-                    path = raw_url
-                    print(f'fwding on {raw_url}: {path}')
-
-                elif domain == 'github.com':
-                    raise NotImplementedError
-                elif domain == 'gitlab.com':
-                    raise NotImplementedError
+                obj = Gist.from_dict(**gist_attrs)
+                if isinstance(obj, Commit):
+                    commit = obj
+                    gist = commit.gist
+                    name = gist.module_name
+                elif isinstance(obj, File):
+                    file = obj
+                    commit = file.commit
+                    name = file.module_fullname
                 else:
-                    pass
+                    raise Exception(f'Unrecognized gist object: {obj}')
+
+                if name in sys.modules:
+                    mod = sys.modules[name]
+                    print(f'Found loaded gist module: {mod}')
+                else:
+                    print(f'Loading gist module {name} (commit {commit})')
+                    spec = importer.find_spec(name, commit=commit)
+                    if not spec:
+                        raise Exception(f'Failed to find spec for {name} (commit {commit})')
+
+                    mod = importer.create_module(spec)
+                    importer.exec_module(mod)
+
+            elif domain == 'github.com':
+                raise NotImplementedError
+            elif domain == 'gitlab.com':
+                raise NotImplementedError
             else:
-                raise Exception(f'Unsupported URL scheme: {url.scheme}')
-
-        # load the notebook object
-        nb_version = nbformat.version_info[0]
-
-        if url.scheme:
-            json = GET(path).content
-            f = BytesIO(json)
-            nb = nbformat.read(f, nb_version)
+                raise Exception(f'Unsupported URL: {path}')
         else:
+            # load a local notebook
+            nb_version = nbformat.version_info[0]
             with open(path, 'r', encoding=encoding) as f:
                 nb = nbformat.read(f, nb_version)
 
-        # create the module and add it to sys.modules
-        # if name in sys.modules:
-        #    return sys.modules[name]
-        mod = ModuleType(path)
-        mod.__file__ = path
-        mod.__loader__ = self
-        mod.__dict__['get_ipython'] = get_ipython
+            # create the module and add it to sys.modules
+            mod = ModuleType(path)
+            mod.__file__ = path
+            mod.__loader__ = self
+            mod.__dict__['get_ipython'] = get_ipython
 
-        # Only do something if it's a python notebook
-        if nb.metadata.kernelspec.language != 'python':
-            return
+            # Only do something if it's a python notebook
+            if nb.metadata.kernelspec.language != 'python': return
 
-        sys.modules[path] = mod
+            sys.modules[path] = mod
 
-        # extra work to ensure that magics that would affect the user_ns
-        # actually affect the notebook module's ns
-        save_user_ns = self.shell.user_ns
-        self.shell.user_ns = mod.__dict__
+            # extra work to ensure that magics that would affect the user_ns
+            # actually affect the notebook module's ns
+            save_user_ns = self.shell.user_ns
+            self.shell.user_ns = mod.__dict__
 
-        try:
-            deleter = CellDeleter()
-            for cell in filter(lambda c: c.cell_type == 'code', nb.cells):
-                # transform the input into executable Python
-                code = self.shell.input_transformer_manager.transform_cell(cell.source)
-                if only_defs:
-                    # Remove anything that isn't a def or a class
-                    tree = deleter.generic_visit(ast.parse(code))
-                else:
-                    tree = ast.parse(code)
-                # run the code in the module
-                codeobj = compile(tree, filename=path, mode='exec')
-                exec(codeobj, mod.__dict__)
-        finally:
-            self.shell.user_ns = save_user_ns
+            try:
+                deleter = CellDeleter()
+                for cell in filter(lambda c: c.cell_type == 'code', nb.cells):
+                    # transform the input into executable Python
+                    code = self.shell.input_transformer_manager.transform_cell(cell.source)
+                    if only_defs:
+                        # Remove anything that isn't a def or a class
+                        tree = deleter.generic_visit(ast.parse(code))
+                    else:
+                        tree = ast.parse(code)
+                    # run the code in the module
+                    codeobj = compile(tree, filename=path, mode='exec')
+                    exec(codeobj, mod.__dict__)
+            finally:
+                self.shell.user_ns = save_user_ns
 
-        # Run any initialisation if available, but only once
-        if run_nbinit and '__nbinit_done__' not in mod.__dict__:
-            if hasattr(mod, '__nbinit__'):
-                mod.__nbinit__()
-                mod.__nbinit_done__ = True
+            # Run any initialisation if available, but only once
+            if run_nbinit and '__nbinit_done__' not in mod.__dict__:
+                if hasattr(mod, '__nbinit__'):
+                    mod.__nbinit__()
+                    mod.__nbinit_done__ = True
 
-        if not names:
-            return mod
+        if not names: return mod
 
         mod_dict = mod.__dict__
+
         if hasattr(mod, '__all__'):
             members = mod.__all__
         else:

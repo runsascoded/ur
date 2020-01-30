@@ -248,12 +248,10 @@ class Gist(metaclass=Meta):
             return commit
 
     @property
-    def git_url(self):
-        return f'git@gist.github.com:{self.id}.git'
+    def git_url(self): return f'https://gist.github.com/donatello/{self.id}'
 
     @property
-    def url(self):
-        return f'https://gist.github.com/{self.id}'
+    def url(self): return f'https://gist.github.com/{self.id}'
 
     @property
     def module_name(self):

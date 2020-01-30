@@ -6,7 +6,7 @@ with open('README.md', 'r') as f:
 setup(
       name='ur',
       packages=[ 'pclass', 'gists', ],
-      version='0.1.1',
+      version='0.1.2',
       description='Import remote Jupyter notebooks (or Python files)',
       long_description=long_description,
       long_description_content_type='text/markdown',

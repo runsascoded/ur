@@ -248,7 +248,7 @@ class Gist(metaclass=Meta):
             return commit
 
     @property
-    def git_url(self): return f'https://gist.github.com/donatello/{self.id}'
+    def git_url(self): return f'https://gist.github.com/{self.id}'
 
     @property
     def url(self): return f'https://gist.github.com/{self.id}'

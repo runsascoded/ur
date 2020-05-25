@@ -208,10 +208,10 @@ class Gist(metaclass=Meta):
         return cls.from_dict(**m)
 
     @classmethod
-    def from_dict(cls, **m):
+    def from_dict(cls, skip_cache=False, **m):
 
         id = m['id']
-        gist = Gist(id)
+        gist = Gist(id, _skip_cache=skip_cache)
 
         user = m.get('user')
         if user: assert user == gist.user

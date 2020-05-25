@@ -9,6 +9,7 @@ from types import ModuleType
 
 from cells import CellDeleter
 from gist import Commit, Gist
+import opts
 
 options = { 'only_defs': True, 'encoding': 'utf-8' }
 
@@ -51,7 +52,7 @@ class Importer:
             gist = commit.gist
             url = commit.url
         else:
-            gist = Gist(id)
+            gist = Gist(id, skip_cache=opts.skip_cache)
             url = gist.url
             if isinstance(commit, str):
                 commit = Commit(commit, gist)

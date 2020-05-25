@@ -12,6 +12,7 @@ from IPython.core.interactiveshell import InteractiveShell
 
 from cells import CellDeleter
 from gist import Commit, File, Gist, chars
+# Injects an `Importer`!
 from gists import importer
 from regex import maybe
 
@@ -53,9 +54,11 @@ class URLLoader:
         run_nbinit=True,
         only_defs=True,
         all=False,
+        skip_cache=False,
         **kwargs,
     ):
-        self.print(f'URLLoader.main({self}, path={path}, names={names}, all={all}, **{kwargs}')
+        log = self.print
+        log(f'URLLoader.main({self}, path={path}, names={names}, all={all}, **{kwargs}')
         gist = kwargs.get('gist')
         github = kwargs.get('github')
         gitlab = kwargs.get('gitlab')
@@ -82,26 +85,26 @@ class URLLoader:
 
                     gist_attrs = merge(gist_attrs, dict(id=id, user=user))
 
-                self.print(f'gist_attrs: {gist_attrs}')
-                obj = Gist.from_dict(**gist_attrs)
+                log(f'{gist_attrs=}')
+                obj = Gist.from_dict(skip_cache=skip_cache, **gist_attrs)
                 if isinstance(obj, Commit):
                     commit = obj
-                    self.print(f'Parsed commit: {commit}')
+                    log(f'Parsed commit: {commit}')
                     gist = commit.gist
                     name = gist.module_name
                 elif isinstance(obj, File):
                     file = obj
                     commit = file.commit
-                    self.print(f'Parsed commit: {commit} (file {file})')
+                    log(f'Parsed commit: {commit} (file {file})')
                     name = file.module_fullname
                 else:
                     raise Exception(f'Unrecognized gist object: {obj}')
 
                 if name in sys.modules:
                     mod = sys.modules[name]
-                    self.print(f'Found loaded gist module: {mod}')
+                    log(f'Found loaded gist module: {mod}')
                 else:
-                    self.print(f'Loading gist module {name} (commit {commit})')
+                    log(f'Loading gist module {name} (commit {commit})')
                     spec = importer.find_spec(name, commit=commit)
                     if not spec:
                         raise Exception(f'Failed to find spec for {name} (commit {commit})')
@@ -179,13 +182,13 @@ class URLLoader:
         if not import_all:
             members = names
 
-        self.print(f'Bubbling up {members}')
+        log(f'Bubbling up {members}')
         update = { name: mod_dict[name] for name in members }
         stk = stack()
         cur_file = stk[0].filename
         cur_dir = Path(cur_file).parent
         frame_info = next(frame for frame in stk if Path(frame.filename).parent != cur_dir)
-        self.print(f'Frame: {frame_info}, {frame_info.filename}')
+        log(f'Frame: {frame_info}, {frame_info.filename}')
         frame_info.frame.f_globals.update(update)
         return mod
 

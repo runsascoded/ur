@@ -15,6 +15,7 @@ class Meta(type):
         cache_type_name=None,
         cache_key='id',
         cache_dir_key='_dir',
+        skip_cache_key='_skip_cache',
         debug=None,
         loader=None,
     ):
@@ -148,7 +149,7 @@ class Meta(type):
                         # kw[cache_key] = getattr(self, cache_key)
                         # kw['name'] = name
 
-                        if path.exists():
+                        if path.exists() and not getattr(self, skip_cache_key, False):
                             # Load from cache
                             load = bind(loader.load)
                             val = load(self, path)
@@ -227,7 +228,7 @@ class Meta(type):
                         # kw[cache_key] = getattr(self, cache_key)
                         # kw['name'] = name
 
-                        if not path.exists():
+                        if not path.exists() or getattr(self, skip_cache_key, False):
                             print(f'Downloading: {name}')
 
                             cache_dir.mkdir(parents=True, exist_ok=True)
@@ -282,6 +283,9 @@ class Meta(type):
                 args = args[1:]
             else:
                 raise Exception(f"Couldn't find {cache_key} field in kwargs or as first element of *args ")
+
+            skip_cache = kwargs.pop(skip_cache_key, False)
+            setattr(self, skip_cache_key, skip_cache)
 
             print(f'Setting cache id {cache_key}={cache_id}')
             setattr(self, cache_key, cache_id)

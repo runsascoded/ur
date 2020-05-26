@@ -7,9 +7,9 @@ from urllib.request import urlretrieve
 from pclass.dircache import Meta
 from pclass.field import field, directfield
 from git import Repo
+import opts
 
 from regex import maybe, one
-
 
 file_chars = '[A-Za-z0-9_\-\.]+'
 chars = '[A-Za-z0-9_\-]+'
@@ -288,22 +288,5 @@ class Gist(metaclass=Meta):
     @property
     def clone_dir(self): return Path(self.clone.git_dir).parent
 
-    # @field
-    # def fragments(self):
-    #     root = self.xml
-    #     file_elems = root.cssselect('.file')
-    #     fragments = {}
-    #     for f in file_elems:
-    #         [ raw_a ] = f.xpath('.//a[contains(., "Raw")]')
-    #         raw_url_path = raw_a.attrib['href']
-    #         gist_url = GistURL.from_full_raw_url_path(raw_url_path)
-    #
-    #         [ link ] = f.cssselect('.file-info > .css-truncate')
-    #         fragment = link.attrib['href']
-    #         if not fragment.startswith('#'):
-    #             raise Exception(f'Expected file header for {gist_url.file} to be an intra-page fragment link; found {fragment}')
-    #         fragment = fragment[1:]
-    #
-    #         fragments[gist_url.file] = fragment
-    #
-    #     return fragments
+
+from gists import importer

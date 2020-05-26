@@ -5,10 +5,10 @@ from IPython import get_ipython
 import nbformat
 from os import environ as env
 import sys
+from sys import stderr
 from types import ModuleType
 
 from cells import CellDeleter
-from gist import Commit, Gist
 import opts
 
 
@@ -30,7 +30,18 @@ class Importer:
         self.print(f'find_spec: {fullname} {path} {target} (commit? {commit})')
 
         path = fullname.split('.')
-        if path[0] != 'gists' and path[0] != 'gist': return
+        if path[0] not in [ 'gists', 'gist' ]: return
+
+        if len(path) == 1:
+            self.print(f'Creating _gist package')
+            spec = spec_from_loader(fullname, self, origin=None, is_package=True)
+            spec.__license__ = "CC BY-SA 3.0"
+            spec._commit = commit
+            spec._file = None
+
+            spec.submodule_search_locations = []
+
+            return spec
 
         id = path[1]
         if id.startswith('_'):
@@ -40,11 +51,13 @@ class Importer:
         if len(path) > 1:
             raise Exception(f'Too many path components for gist {id}: {path}')
 
+        from _gist import Commit, Gist
+
         if isinstance(commit, Commit):
             gist = commit.gist
             url = commit.url
         else:
-            self.print(f'Gist {id}: {opts.skip_cache=}')
+            self.print(f'Gist {id}: skip_cache={opts.skip_cache}')
             gist = Gist(id, _skip_cache=opts.skip_cache)
             url = gist.url
             if isinstance(commit, str):
@@ -108,15 +121,32 @@ class Importer:
 
     def exec(self, name, commit, dct, file=None):
         if not file:
-            for file in commit.files:
-                module_name = file.module_name
-                fullname = f'{name}.{module_name}'
-                file_spec = self.find_spec(fullname, commit=commit.id)
-                if file_spec:
-                    self.print(f'Found spec for child module {module_name} ({fullname})')
-                    file_mod = self.create_module(file_spec)
-                    self.exec_module(file_mod)
-                    dct[module_name] = file_mod
+            if commit:
+                file_mods = []
+                for file in commit.files:
+                    module_name = file.module_name
+                    fullname = f'{name}.{module_name}'
+                    file_spec = self.find_spec(fullname, commit=commit.id)
+                    if file_spec:
+                        self.print(f'Found spec for child module {module_name} ({fullname})')
+                        file_mod = self.create_module(file_spec)
+                        file_mods.append(file_mod)
+                        dct[module_name] = file_mod
+
+                # Temporarily add a local notebook loader rooted at the Gist's root, so that local imports within the Gist resolve
+                from local_importer import NotebookFinder
+                finder = NotebookFinder(str(commit.gist.clone_dir))
+                prev_meta_path = sys.meta_path.copy()
+                try:
+                    sys.meta_path += [ finder ]
+                    [ self.exec_module(file_mod) for file_mod in file_mods ]
+                finally:
+                    # Remove this Gist's custom loader, verifying that meta_path looks the way we expect
+                    [ pos ] = [ idx for idx, loader in enumerate(sys.meta_path) if loader is finder ]
+                    if len(prev_meta_path) + 1 != len(sys.meta_path) or \
+                        pos != len(prev_meta_path):
+                        stderr.write(f'Unexpected meta_path change while executing module {file_mod}: {len(prev_meta_path)} → {len(sys.meta_path)} entries, new loader at position {pos}\n')
+                    sys.meta_path.pop(pos)
         else:
             self.print(f'Attempt to exec module {name}')
             if file.name.endswith('.py'):
@@ -164,3 +194,9 @@ importer = Importer()
 
 if not any([ isinstance(importer, Importer) for importer in sys.meta_path ]):
     sys.meta_path.append(importer)
+
+
+from local_importer import NotebookFinder
+local_importer = NotebookFinder()
+if not any([ isinstance(importer, NotebookFinder) for importer in sys.meta_path ]):
+    sys.meta_path.append(local_importer)

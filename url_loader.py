@@ -11,7 +11,7 @@ from IPython import get_ipython
 from IPython.core.interactiveshell import InteractiveShell
 
 from cells import CellDeleter
-from gist import Commit, File, Gist, chars
+
 # Injects an `Importer`!
 from gists import importer
 import opts
@@ -65,6 +65,9 @@ class URLLoader:
         url = urlparse(path)
         if url.scheme or gist or github or gitlab:
             domain = url.netloc
+
+            from _gist import Commit, File, Gist, chars
+
             gist_attrs = Gist.parse_url(path, throw=False)
             if gist_attrs or gist:
                 assert not github
@@ -83,7 +86,7 @@ class URLLoader:
 
                     gist_attrs = merge(gist_attrs, dict(id=id, user=user))
 
-                log(f'{gist_attrs=}')
+                log(f'gist_attrs: {gist_attrs}')
                 obj = Gist.from_dict(skip_cache=opts.skip_cache, **gist_attrs)
                 if isinstance(obj, Commit):
                     commit = obj

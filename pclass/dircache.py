@@ -4,8 +4,10 @@ from pathlib import Path
 
 from .field import DirectField, Field
 from .loader import Loader
+import opts
 
 class Meta(type):
+    '''Metaclass for classes that lazily evaluate and cache `@field`s in a directory on disk'''
 
     DEFAULT_CACHE_DIR = '.objs'
 
@@ -35,16 +37,23 @@ class Meta(type):
 
         Example:
         '''
-        def print(*args, **kwargs):
-            if debug:
-                debug(*args, **kwargs)
 
-        print(f'Meta.__new__({mcs}, {clsname}, {bases}, {dct})')
+        debug = debug or opts.verbose
+        def log(*args, **kwargs):
+            if debug:
+                writer = debug
+                if debug is True:
+                    writer = print
+                writer(*args, **kwargs)
+
+        log(f'Meta.__new__({mcs}, {clsname}, {bases}, {dct})')
         methods = dct.copy()
         fields = []
 
         ### Cache initialization ###
 
+        cache_root = cache_root or opts.cache_root
+        log(f'cache_root={cache_root}')
         if not cache_root:
             cache_root = mcs.DEFAULT_CACHE_DIR
 
@@ -55,7 +64,7 @@ class Meta(type):
 
         class_dir = cache_root / cache_type_name
         class_dir.mkdir(parents=True, exist_ok=True)
-        print(f'Class cache dir: {class_dir}')
+        log(f'Class cache dir: {class_dir}')
 
         ### Persisted/Cached/Lazy Field Handling ###
         # Look for methods annotated with `@field`, and munge them to:
@@ -76,40 +85,40 @@ class Meta(type):
         #   been computed/accessed
 
         for name, member in dct.items():
-            print(f'Checking: {name}: {member}')
+            log(f'Checking: {name}: {member}')
 
             def _bind(fn, name, **_kw):
                 kw = _kw.copy()
                 params = signature(fn).parameters
-                print(f'{name} params: {params} for fn {fn}')
+                log(f'{name} params: {params} for fn {fn}')
                 if 'name' in params:
-                    print(f'{name} adding name {name} to {fn}')
+                    log(f'{name} adding name {name} to {fn}')
                     kw['name'] = name
 
                 has_kwargs = Kind.VAR_KEYWORD in [ param.kind for param in params.values() ]
 
                 def wrapped(self, path, name, **_kw):
                     if cache_key in params or has_kwargs:
-                        print(f'{name} adding {cache_key} to {fn}')
+                        log(f'{name} adding {cache_key} to {fn}')
                         kw[cache_key] = getattr(self, cache_key)
                     if 'path' in params or has_kwargs:
-                        print(f'{name} adding path {path} to {fn}')
+                        log(f'{name} adding path {path} to {fn}')
                         kw['path'] = path
                     if 'self' in params:
-                        print(f'{name} adding self {self} to {fn}')
+                        log(f'{name} adding self {self} to {fn}')
                         kw['self'] = self
 
-                    print(f'{name}: calling {fn} with {kw}')
+                    log(f'{name}: calling {fn} with {kw}')
                     return fn(**_kw, **kw)
 
                 return partial(wrapped, name=name)
 
             bind = partial(_bind, name=name)
-            print(f'{name}: bind {bind} {signature(bind).parameters}')
+            log(f'{name}: bind {bind} {signature(bind).parameters}')
 
             if isinstance(member, Field):
                 field = member
-                print(f'field: {name} -> {field}')
+                log(f'field: {name} -> {field}')
                 fields.append(name)
                 _name = f'_{name}'
 
@@ -134,7 +143,7 @@ class Meta(type):
                     :return: the value of this `Field` on the `self` class instance (whether loaded from cache or
                              computed + saved to cache)
                     '''
-                    print(f'wrapped_fn: {name} ({_name}): field {field} loader {loader}')
+                    log(f'wrapped_fn: {name} ({_name}): field {field} loader {loader}')
                     if not hasattr(self, _name):
                         # This field's value hasn't been loaded or computed on this instance yet
 
@@ -154,17 +163,17 @@ class Meta(type):
                             load = bind(loader.load)
                             val = load(self, path)
                             #val = loader.load(path, **kw)
-                            print(f'Loaded attr from cache: {_name}={val}')
+                            log(f'Loaded attr from cache: {_name}={val}')
                         else:
-                            print(f'Computing: {name}')
+                            log(f'Computing: {name}')
 
                             # Compute the field's value
                             val = field.compute(self)
-                            print(f'Computed: {name}={val}')
+                            log(f'Computed: {name}={val}')
 
                             cache_dir.mkdir(parents=True, exist_ok=True)
 
-                            print(f'Saving {name} to {path}')
+                            log(f'Saving {name} to {path}')
                             save = loader.save
                             if save:
                                 save = bind(save)
@@ -174,7 +183,7 @@ class Meta(type):
                         # set loaded/computed value on `self` instance
                         setattr(self, _name, val)
                     else:
-                        print(f'Lookup: {name}={getattr(self, _name)}')
+                        log(f'Lookup: {name}={getattr(self, _name)}')
 
                     return getattr(self, _name)
 
@@ -185,11 +194,11 @@ class Meta(type):
                 prop = property(applied)
 
                 # Store the modified field getter on the class' definition
-                print(f'Setting method: {name}: {prop}')
+                log(f'Setting method: {name}: {prop}')
                 methods[name] = prop
             elif isinstance(member, DirectField):
                 field = member
-                print(f'field: {name} -> {field}')
+                log(f'field: {name} -> {field}')
                 fields.append(name)
                 _name = f'_{name}'
 
@@ -213,7 +222,7 @@ class Meta(type):
                     :return: the value of this `Field` on the `self` class instance (whether loaded from cache or
                              computed + saved to cache)
                     '''
-                    print(f'wrapped_fn: {name} ({_name}): field {field}')
+                    log(f'wrapped_fn: {name} ({_name}): field {field}')
                     if not hasattr(self, _name):
                         # This field's value hasn't been loaded or computed on this instance yet
 
@@ -229,7 +238,7 @@ class Meta(type):
                         # kw['name'] = name
 
                         if not path.exists() or getattr(self, skip_cache_key, False):
-                            print(f'Downloading: {name}')
+                            log(f'Downloading: {name}')
 
                             cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -237,18 +246,18 @@ class Meta(type):
                             download = bind(field.download)
                             download(self, path)
                             # field.download(self, path, **kw)
-                            print(f'Downloaded to {path}')
+                            log(f'Downloaded to {path}')
 
                         # Load from cache
                         parse = bind(field.parse)
                         val = parse(self, path)
                         # val = field.parse(path, **kw)
-                        print(f'Loaded attr from cache: {_name}={val}')
+                        log(f'Loaded attr from cache: {_name}={val}')
 
                         # set loaded/computed value on `self` instance
                         setattr(self, _name, val)
                     else:
-                        print(f'Lookup: {name}={getattr(self, _name)}')
+                        log(f'Lookup: {name}={getattr(self, _name)}')
 
                     return getattr(self, _name)
 
@@ -259,13 +268,13 @@ class Meta(type):
                 prop = property(applied)
 
                 # Store the modified field getter on the class' definition
-                print(f'Setting method: {name}: {prop}')
+                log(f'Setting method: {name}: {prop}')
                 methods[name] = prop
             else:
-                print(f'Skipping: {name}')
+                log(f'Skipping: {name}')
 
         # List of fields that were instrumented
-        print(f'Fields: {fields}')
+        log(f'Fields: {fields}')
 
         orig_init = None
         if '__init__' in methods:
@@ -274,7 +283,7 @@ class Meta(type):
         def __init__(self, *args, **_kwargs):
             '''Auto-generated constructor that injects a primary-key argument, and sets a field-cache directory'''
             kwargs = _kwargs.copy()
-            print(f'__init__(self, {args}, {kwargs})')
+            log(f'__init__(self, {args}, {kwargs})')
 
             if cache_key in kwargs:
                 cache_id = kwargs.pop(cache_key)
@@ -287,17 +296,17 @@ class Meta(type):
             skip_cache = kwargs.pop(skip_cache_key, False)
             setattr(self, skip_cache_key, skip_cache)
 
-            print(f'Setting cache id {cache_key}={cache_id}')
+            log(f'Setting cache id {cache_key}={cache_id}')
             setattr(self, cache_key, cache_id)
 
             cache_dir = class_dir / str(cache_id)
             setattr(self, cache_dir_key, cache_dir)
-            print(f'Set {cache_dir_key}={cache_dir} for id {cache_id}')
+            log(f'Set {cache_dir_key}={cache_dir} for id {cache_id}')
 
             if orig_init:
                 orig_init(self, *args, **kwargs)
 
-            print(f'Done with injected __init__')
+            log(f'Done with injected __init__')
 
         methods['__init__'] = wraps(orig_init)(__init__) if orig_init else __init__
 
@@ -318,6 +327,6 @@ class Meta(type):
             methods['__repr__'] = __str__
 
         new = super(Meta, mcs).__new__(mcs, clsname, bases, methods)
-        print(f'returning {new}: {methods}')
+        log(f'returning {new}: {methods}')
 
         return new

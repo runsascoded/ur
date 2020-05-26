@@ -273,8 +273,14 @@ class Gist(metaclass=Meta):
     @directfield(parse=Repo)
     def clone(self, path):
         url = self.git_url
-        print(f'Cloning {url} into {path}')
-        check_call([ 'git', 'clone', url, str(path) ])
+        if path.exists():
+            print(f'{path} exists; attempting to pull')
+            from git import Repo
+            repo = Repo(path)
+            repo.remotes.origin.pull()
+        else:
+            print(f'Cloning {url} into {path}')
+            check_call([ 'git', 'clone', url, str(path) ])
 
     @property
     def commit(self): return Commit(self.clone.commit().hexsha, self)

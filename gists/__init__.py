@@ -11,8 +11,6 @@ from cells import CellDeleter
 from gist import Commit, Gist
 import opts
 
-options = { 'only_defs': True, 'encoding': 'utf-8' }
-
 
 class Importer:
     '''Importer providing a synthetic "gists" top-level package that allows importing `.py` and `.ipynb` files from
@@ -22,23 +20,17 @@ class Importer:
 
     def __init__(self, **kw):
         self.shell = InteractiveShell.instance()
-
-        if 'debug' in kw:
-            self._print = kw['debug']
-        elif self.DEBUG_ENV_VAR in env and env[self.DEBUG_ENV_VAR]:
-            self._print = print
-        else:
-            self._print = None
+        self._print = print
 
     def print(self, *args, **kwargs):
-        if self._print:
+        if opts.verbose:
             self._print(*args, **kwargs)
 
     def find_spec(self, fullname, path=None, target=None, commit=None):
         self.print(f'find_spec: {fullname} {path} {target} (commit? {commit})')
 
         path = fullname.split('.')
-        if path[0] != 'gists': return
+        if path[0] != 'gists' and path[0] != 'gist': return
 
         id = path[1]
         if id.startswith('_'):
@@ -52,7 +44,8 @@ class Importer:
             gist = commit.gist
             url = commit.url
         else:
-            gist = Gist(id, skip_cache=opts.skip_cache)
+            self.print(f'Gist {id}: {opts.skip_cache=}')
+            gist = Gist(id, _skip_cache=opts.skip_cache)
             url = gist.url
             if isinstance(commit, str):
                 commit = Commit(commit, gist)
@@ -154,7 +147,7 @@ class Importer:
                     for cell in filter(lambda c: c.cell_type == 'code', nb.cells):
                         # transform the input into executable Python
                         code = self.shell.input_transformer_manager.transform_cell(cell.source)
-                        if options['only_defs']:
+                        if opts.only_defs:
                             # Remove anything that isn't a def or a class
                             tree = deleter.generic_visit(ast.parse(code))
                         else:

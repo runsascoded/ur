@@ -14,6 +14,7 @@ from cells import CellDeleter
 from gist import Commit, File, Gist, chars
 # Injects an `Importer`!
 from gists import importer
+import opts
 from regex import maybe
 
 
@@ -40,21 +41,18 @@ class URLLoader:
     def __init__(self, path=None):
         self.shell = InteractiveShell.instance()
         self.path = path
-        self._print = None
+        self._print = print
 
     def print(self, *args, **kwargs):
-        if self._print:
+        if opts.verbose:
             self._print(*args, **kwargs)
 
     def main(
         self,
         path=None,
         *names,
-        encoding='utf-8',
         run_nbinit=True,
-        only_defs=True,
         all=False,
-        skip_cache=False,
         **kwargs,
     ):
         log = self.print
@@ -86,7 +84,7 @@ class URLLoader:
                     gist_attrs = merge(gist_attrs, dict(id=id, user=user))
 
                 log(f'{gist_attrs=}')
-                obj = Gist.from_dict(skip_cache=skip_cache, **gist_attrs)
+                obj = Gist.from_dict(skip_cache=opts.skip_cache, **gist_attrs)
                 if isinstance(obj, Commit):
                     commit = obj
                     log(f'Parsed commit: {commit}')
@@ -121,7 +119,7 @@ class URLLoader:
         else:
             # load a local notebook
             nb_version = nbformat.version_info[0]
-            with open(path, 'r', encoding=encoding) as f:
+            with open(path, 'r', encoding=opts.encoding) as f:
                 nb = nbformat.read(f, nb_version)
 
             # create the module and add it to sys.modules
@@ -145,10 +143,12 @@ class URLLoader:
                 for cell in filter(lambda c: c.cell_type == 'code', nb.cells):
                     # transform the input into executable Python
                     code = self.shell.input_transformer_manager.transform_cell(cell.source)
-                    if only_defs:
+                    if opts.only_defs:
+                        log(f'defs only')
                         # Remove anything that isn't a def or a class
                         tree = deleter.generic_visit(ast.parse(code))
                     else:
+                        log(f'all symbols!')
                         tree = ast.parse(code)
                     # run the code in the module
                     codeobj = compile(tree, filename=path, mode='exec')
@@ -157,7 +157,7 @@ class URLLoader:
                 self.shell.user_ns = save_user_ns
 
             # Run any initialisation if available, but only once
-            if run_nbinit and '__nbinit_done__' not in mod.__dict__:
+            if opts.run_nbinit and '__nbinit_done__' not in mod.__dict__:
                 if hasattr(mod, '__nbinit__'):
                     mod.__nbinit__()
                     mod.__nbinit_done__ = True

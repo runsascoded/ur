@@ -22,6 +22,12 @@ jobs:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
 
+    - name: nbconvert README
+      uses: ./.github/actions/convert
+      id: convert
+      with:
+        args: -r ${{github.base_ref}} -b ${{github.head_ref}} --token ${{secrets.TOKEN}} --repository ${{github.repository}} README.ipynb
+
     # Runs a single command using the runners shell
     - name: Build Docker container for testing
       run: docker build -f Dockerfile.test -t ur-test .

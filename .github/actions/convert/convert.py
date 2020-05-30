@@ -54,7 +54,10 @@ def main():
   if not paths:
     paths = lines('git','ls-files','*.ipynb')
 
-  print(lines('git','branch','-v','-r'))
+  print('\n'.join(lines('git','branch','-v','-r')))
+  print('\n'.join(lines('git','remote','-vv')))
+  print('\n'.join(lines('env')))
+  print('\n'.join(lines('find','.')))
 
   print(f'Checking paths: {paths}')
   changed_nbs = lines(['git','diff','--name-only',revision,'--'] + paths)

@@ -11,9 +11,11 @@ from IPython import get_ipython
 from IPython.core.interactiveshell import InteractiveShell
 
 from cells import CellDeleter
-from gist import Commit, File, Gist, chars
+
+# Injects an `Importer`!
 from gists import importer
-from regex import maybe
+import opts
+from rgxs import maybe
 
 
 def merge(l, r, *keys):
@@ -39,23 +41,22 @@ class URLLoader:
     def __init__(self, path=None):
         self.shell = InteractiveShell.instance()
         self.path = path
-        self._print = None
+        self._print = print
 
     def print(self, *args, **kwargs):
-        if self._print:
+        if opts.verbose:
             self._print(*args, **kwargs)
 
     def main(
         self,
         path=None,
         *names,
-        encoding='utf-8',
         run_nbinit=True,
-        only_defs=True,
         all=False,
         **kwargs,
     ):
-        self.print(f'URLLoader.main({self}, path={path}, names={names}, all={all}, **{kwargs}')
+        log = self.print
+        log(f'URLLoader.main({self}, path={path}, names={names}, all={all}, **{kwargs}')
         gist = kwargs.get('gist')
         github = kwargs.get('github')
         gitlab = kwargs.get('gitlab')
@@ -64,6 +65,9 @@ class URLLoader:
         url = urlparse(path)
         if url.scheme or gist or github or gitlab:
             domain = url.netloc
+
+            from _gist import Commit, File, Gist, chars
+
             gist_attrs = Gist.parse_url(path, throw=False)
             if gist_attrs or gist:
                 assert not github
@@ -82,26 +86,26 @@ class URLLoader:
 
                     gist_attrs = merge(gist_attrs, dict(id=id, user=user))
 
-                self.print(f'gist_attrs: {gist_attrs}')
-                obj = Gist.from_dict(**gist_attrs)
+                log(f'gist_attrs: {gist_attrs}')
+                obj = Gist.from_dict(skip_cache=opts.skip_cache, **gist_attrs)
                 if isinstance(obj, Commit):
                     commit = obj
-                    self.print(f'Parsed commit: {commit}')
+                    log(f'Parsed commit: {commit}')
                     gist = commit.gist
                     name = gist.module_name
                 elif isinstance(obj, File):
                     file = obj
                     commit = file.commit
-                    self.print(f'Parsed commit: {commit} (file {file})')
+                    log(f'Parsed commit: {commit} (file {file})')
                     name = file.module_fullname
                 else:
                     raise Exception(f'Unrecognized gist object: {obj}')
 
                 if name in sys.modules:
                     mod = sys.modules[name]
-                    self.print(f'Found loaded gist module: {mod}')
+                    log(f'Found loaded gist module: {mod}')
                 else:
-                    self.print(f'Loading gist module {name} (commit {commit})')
+                    log(f'Loading gist module {name} (commit {commit})')
                     spec = importer.find_spec(name, commit=commit)
                     if not spec:
                         raise Exception(f'Failed to find spec for {name} (commit {commit})')
@@ -113,60 +117,24 @@ class URLLoader:
                 raise NotImplementedError
             elif domain == 'gitlab.com':
                 raise NotImplementedError
-            else:
-                raise Exception(f'Unsupported URL: {path}')
+            elif match(r'https?', url.scheme):
+                from url import URL
+                url = URL(path)
+                url.content
+                path = url._dir / 'content'
+                print(f'Forwarding dir {path} for url {url}')
+                mod = importer.exec_path(path)
         else:
-            # load a local notebook
-            nb_version = nbformat.version_info[0]
-            with open(path, 'r', encoding=encoding) as f:
-                nb = nbformat.read(f, nb_version)
-
-            # create the module and add it to sys.modules
-            mod = ModuleType(path)
-            mod.__file__ = path
-            mod.__loader__ = self
-            mod.__dict__['get_ipython'] = get_ipython
-
-            # Only do something if it's a python notebook
-            if nb.metadata.kernelspec.language != 'python': return
-
-            sys.modules[path] = mod
-
-            # extra work to ensure that magics that would affect the user_ns
-            # actually affect the notebook module's ns
-            save_user_ns = self.shell.user_ns
-            self.shell.user_ns = mod.__dict__
-
-            try:
-                deleter = CellDeleter()
-                for cell in filter(lambda c: c.cell_type == 'code', nb.cells):
-                    # transform the input into executable Python
-                    code = self.shell.input_transformer_manager.transform_cell(cell.source)
-                    if only_defs:
-                        # Remove anything that isn't a def or a class
-                        tree = deleter.generic_visit(ast.parse(code))
-                    else:
-                        tree = ast.parse(code)
-                    # run the code in the module
-                    codeobj = compile(tree, filename=path, mode='exec')
-                    exec(codeobj, mod.__dict__)
-            finally:
-                self.shell.user_ns = save_user_ns
-
-            # Run any initialisation if available, but only once
-            if run_nbinit and '__nbinit_done__' not in mod.__dict__:
-                if hasattr(mod, '__nbinit__'):
-                    mod.__nbinit__()
-                    mod.__nbinit_done__ = True
+            mod = importer.exec_path(path)
 
         if not names and not all: return mod
 
-        mod_dict = mod.__dict__
+        dct = mod.__dict__
 
         if hasattr(mod, '__all__'):
             members = mod.__all__
         else:
-            members = [ name for name in mod_dict if not name.startswith('_') ]
+            members = [ name for name in dct if not name.startswith('_') ]
 
         import_all = '*' in names or all is True or all == '*'
         if import_all:
@@ -179,13 +147,12 @@ class URLLoader:
         if not import_all:
             members = names
 
-        self.print(f'Bubbling up {members}')
-        update = { name: mod_dict[name] for name in members }
+        log(f'Bubbling up {members}')
+        update = { name: dct[name] for name in members }
         stk = stack()
         cur_file = stk[0].filename
         cur_dir = Path(cur_file).parent
         frame_info = next(frame for frame in stk if Path(frame.filename).parent != cur_dir)
-        self.print(f'Frame: {frame_info}, {frame_info.filename}')
+        log(f'Frame: {frame_info}, {frame_info.filename}')
         frame_info.frame.f_globals.update(update)
         return mod
-

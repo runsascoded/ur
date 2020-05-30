@@ -1,7 +1,18 @@
 # ur
-import remote Python and Jupyter notebook files, from GitHub Gists, the local filesystem, or arbitrary URLs.
+*Universal Resources*: import remote Python and Jupyter notebook files, from GitHub Gists, the local filesystem, or arbitrary URLs.
 
-## Install:
+- [Install](#install)
+- [Usage](#usage)
+  - [Import GitHub Gists](#gists)
+  - [Import arbitrary URLs](#urls)
+  - [Configuration: `ur.opts`](#configs)
+- [Discussion](#discussion)
+  - ["package-less publishing"](#package-less)
+  - ["anyone with the link can view" git repositories](#link-visibility)
+  - [Use-case: portable, shareable "dotfiles"](#dotfiles)
+  - [Future work](#future-work)
+
+## Install: <a id="install"></a>
 
 
 ```python
@@ -9,13 +20,13 @@ from sys import executable as python
 !{python} -m pip install -q ur
 ```
 
-## Usage
+## Usage <a id="usage"></a>
 
-### Import GitHub gists
+### Import GitHub Gists <a id="gists"></a>
 
 
 ```python
-from gists._1288bff2f9e05394a94312010da267bb import *
+from gist._1288bff2f9e05394a94312010da267bb import *
 a_b.a(), a_b.b(), c.c()
 ```
 
@@ -28,7 +39,7 @@ a_b.a(), a_b.b(), c.c()
 
 That imports 2 Jupyter notebooks from https://gist.github.com/1288bff2f9e05394a94312010da267bb (note the leading underscore in the `import` statement, which is necessary when the Gist ID begins with a number), and calls functions defined in them.
 
-### Import arbitrary URLs
+### Import arbitrary URLs <a id="urls"></a>
 The `ur` module exposes a powerful API for importing code from {local,remote} {`.py`,`.ipynb`} files.
 
 Here is an example directly importing one of the files in [the example gist used above](https://gist.github.com/ryan-williams/1288bff2f9e05394a94312010da267bb):
@@ -98,7 +109,38 @@ c()
 
 
 
-## Discussion
+### Configuration: `ur.opts` <a id="configs"></a>
+Various behaviors can be configured via the `ur.opts` object:
+
+#### `only_defs` <a id="config.only_defs"></a>
+Default: `True`
+
+Only bring certain top-level entities (functions, modules, and imported symbols; see [`CellDeleter`](./cells.py)) into scope from the imported module.
+
+#### `verbose` <a id="config.verbose"></a>
+Default: `False`
+Eenable verbose logging during import magic
+
+#### `skip_cache` <a id="config.skip_cache"></a>
+Default: `False`
+
+When set, pull latest versions of imported modules (instead of reusing Git clones cached by previous runs).
+
+#### `cache_root` <a id="config.cache_root"></a>
+Default `.objs`
+
+Remote imported modules are cloned and cached here, namespaced by their type and a primary key.
+
+For example, the example Gist referenced above will persist information in a directory called `.objs/Gist/1288bff2f9e05394a94312010da267bb`.
+
+[`cache-root-example.ipynb`](./cache-root-example.ipynb) shows how to set a non-default `cache_root`, and what the cache dir's contents look like.
+
+#### `encoding` <a id="config.encoding"></a>
+Default: `utf-8`
+
+Encoding to decode remote notebooks with.
+
+## Discussion <a id="discussion"></a>
 Jupyter notebooks provide a rich, literate programming experience that is preferable to conventional IDE-based Python environments in many ways.
 
 However, conventional wisdom is that reusing code in notebooks requires porting it to `.py` files. This is tedious and often requires trashing some of what makes notebooks great in the first place (rich, inline documentation, easy reproducibility, etc.).
@@ -109,13 +151,13 @@ Jupyter itself provides [sample code for importing code from (local) Jupyter not
 
 The Jupyter ecosystem increasingly shines for the ease with which it allows of publishing and sharing notebooks, and stands to gain a lot from easier remixing+reuse of the wealth of code and data being published in Jupyter notebooks every day. I believe there are straightforward answers to [the reproducibility and testability concerns raised in `nbimporter`](https://github.com/grst/nbimporter/blob/0fc2bdf458005be742090f67c306a4e3bcc04e77/README.md#why), and built the `ur` package to bear that out (and solve immediate productivity and code-reuse needs in my day-to-day life).
 
-### Remote importing: package-less publishing
+### Remote importing: package-less publishing <a id="package-less"></a>
 An animating idea of `ur` is that publishing+reusing a useful helper function should be no harder than
 Reuse of code in Jupyter notebooks should be made as easy as possible. Users shouldn't have to mangle their utility-code and then publish it to Pip repositories in order to avoid copy/pasting standard helpers in every notebook/project they work in.
 
 Importing code directly from remote Notebooks (or `.py` files) allows frictionless code reuse beyond what Python/Jupyter users are offered today.
 
-### GitHub Gists: "anyone with the link can view" git repositories
+### GitHub Gists: "anyone with the link can view" git repositories <a id="link-visibility"></a>
 `ur` particularly emphasizes using and importing from [GitHub Gists](https://help.github.com/en/enterprise/2.13/user/articles/about-gists). Like `git` itself, Gists combine a few simple but powerful concepts orthogonally, forming a great platform for sharing and tracking code:
 - Gists are the only service I'm aware of that allows "publishing" a Git repository to an opaque URL that can be easily shared, but is otherwise (cryptographically, I think?) private, not search-indexed, etc.
   - [GitLab snippets](https://docs.gitlab.com/ee/user/snippets.html) are a comparable product, but [a request for this feature is open at time of writing](https://gitlab.com/gitlab-org/gitlab/issues/14201)
@@ -126,7 +168,7 @@ Importing code directly from remote Notebooks (or `.py` files) allows frictionle
 - Many CLIs and SDKs exist for interacting with Gists from different languages/environments
   - [I previously wrote a `gist-dir` helper](https://github.com/defunkt/gist/issues/191#issuecomment-569572229) that uploads an entire directory as a Gist (also working around issues with binary data that the Gist API normally doesn't handle correctly)
 
-### Use-case: portable, shareable "dotfiles"
+### Use-case: portable, shareable "dotfiles" <a id="dotfiles"></a>
 Something that `ur` makes easy is boilerplate-free reuse of common imports and aliases across notebooks/projects/users.
 
 For example, "everyone" imports `numpy as np`, `pandas as pd`, `plotly as pl`, etc. I have a few that I like in addition: `from os import environ as env`, `from sys import python as executable`, etc.
@@ -144,7 +186,7 @@ Many versions of this can be used, depending on your preferences, e.g.:
 from gists.abcdef0123456789abcdef0123456789 import *
 ```
 
-### Future work
+### Future work <a id="future-work"></a>
 - pretty-print info about what's imported (in notebook environments)
 - test/handle intra-gist imports
 - test/handle pip dependencies in gist imports

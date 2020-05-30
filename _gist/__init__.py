@@ -7,9 +7,9 @@ from urllib.request import urlretrieve
 from pclass.dircache import Meta
 from pclass.field import field, directfield
 from git import Repo
+import opts
 
-from regex import maybe, one
-
+from rgxs import maybe, one
 
 file_chars = '[A-Za-z0-9_\-\.]+'
 chars = '[A-Za-z0-9_\-]+'
@@ -149,6 +149,11 @@ class Gist(metaclass=Meta):
         WWW_URL_PATH_REGEX,
         RAW_URL_PATH_REGEX,
     ]
+    ID_LEN = 32
+
+    def __init__(self):
+        if not match(r'[0-9a-f]{%d}' % self.ID_LEN, self.id):
+            raise ValueError(f'Unrecognized Gist id: {self.id}')
 
     @classmethod
     def from_url(cls, url, throw=True):
@@ -208,10 +213,10 @@ class Gist(metaclass=Meta):
         return cls.from_dict(**m)
 
     @classmethod
-    def from_dict(cls, **m):
+    def from_dict(cls, skip_cache=False, **m):
 
         id = m['id']
-        gist = Gist(id)
+        gist = Gist(id, _skip_cache=skip_cache)
 
         user = m.get('user')
         if user: assert user == gist.user
@@ -248,12 +253,10 @@ class Gist(metaclass=Meta):
             return commit
 
     @property
-    def git_url(self):
-        return f'git@gist.github.com:{self.id}.git'
+    def git_url(self): return f'https://gist.github.com/{self.id}'
 
     @property
-    def url(self):
-        return f'https://gist.github.com/{self.id}'
+    def url(self): return f'https://gist.github.com/{self.id}'
 
     @property
     def module_name(self):
@@ -275,8 +278,14 @@ class Gist(metaclass=Meta):
     @directfield(parse=Repo)
     def clone(self, path):
         url = self.git_url
-        print(f'Cloning {url} into {path}')
-        check_call([ 'git', 'clone', url, str(path) ])
+        if path.exists():
+            print(f'{path} exists; attempting to pull')
+            from git import Repo
+            repo = Repo(path)
+            repo.remotes.origin.pull()
+        else:
+            print(f'Cloning {url} into {path}')
+            check_call([ 'git', 'clone', url, str(path) ])
 
     @property
     def commit(self): return Commit(self.clone.commit().hexsha, self)
@@ -284,22 +293,5 @@ class Gist(metaclass=Meta):
     @property
     def clone_dir(self): return Path(self.clone.git_dir).parent
 
-    # @field
-    # def fragments(self):
-    #     root = self.xml
-    #     file_elems = root.cssselect('.file')
-    #     fragments = {}
-    #     for f in file_elems:
-    #         [ raw_a ] = f.xpath('.//a[contains(., "Raw")]')
-    #         raw_url_path = raw_a.attrib['href']
-    #         gist_url = GistURL.from_full_raw_url_path(raw_url_path)
-    #
-    #         [ link ] = f.cssselect('.file-info > .css-truncate')
-    #         fragment = link.attrib['href']
-    #         if not fragment.startswith('#'):
-    #             raise Exception(f'Expected file header for {gist_url.file} to be an intra-page fragment link; found {fragment}')
-    #         fragment = fragment[1:]
-    #
-    #         fragments[gist_url.file] = fragment
-    #
-    #     return fragments
+
+from gists import importer

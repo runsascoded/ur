@@ -4,6 +4,7 @@ from subprocess import check_call, check_output, CalledProcessError
 
 
 def lines(*cmd):
+  print(f'Runnig: {cmd}')
   if len(cmd) == 1 and (isinstance(cmd[0], list) or isinstance(cmd[0], tuple)):
     cmd = cmd[0]
   return [

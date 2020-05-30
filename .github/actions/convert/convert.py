@@ -21,7 +21,7 @@ def run(*cmd):
 
 def main():
   parser = ArgumentParser()
-  parser.add_argument('-r', '--revision', help='Git revision range to compute diffs since')
+  parser.add_argument('-r', '--revision', help='Git revision (or range) to compute diffs against')
   parser.add_argument('--token', help='Git access token for pushing changes')
   parser.add_argument('--repository', help='Git repository (org/repo) to push to')  # TODO: infer from existing remote
   parser.add_argument('-u', '--user', required=False, help='user.name for Git commit')
@@ -47,6 +47,12 @@ def main():
         raise ValueError(f'First "--" at position {idx} (expected 0)')
       paths = paths[1:]
 
+  remote = args.remote
+  if not args.remote:
+    print('Looking for remote:')
+    print('\n'.join(lines('git','remote','-vv')))
+    [remote] = lines('git','remote')
+
   if not paths:
     paths = lines('git','ls-files','*.ipynb')
 
@@ -67,11 +73,11 @@ def main():
 
   if updates:
     print(f'Found {fmt} files that need updating: {updates}')
-    remote = args.remote
-    if not args.remote:
-      print('Looking for remote:')
-      print('\n'.join(lines('git','remote','-vv')))
-      [remote] = lines('git','remote')
+    # remote = args.remote
+    # if not args.remote:
+    #   print('Looking for remote:')
+    #   print('\n'.join(lines('git','remote','-vv')))
+    #   [remote] = lines('git','remote')
 
       branch = args.branch
 

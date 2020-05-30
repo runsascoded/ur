@@ -4,7 +4,7 @@ from subprocess import check_call, check_output, CalledProcessError
 
 
 def lines(*cmd, keep_trailing_newline=False):
-  print(f'Runnig: {cmd}')
+  print(f'Running: {cmd}')
   if len(cmd) == 1 and (isinstance(cmd[0], list) or isinstance(cmd[0], tuple)):
     cmd = cmd[0]
   lines = [
@@ -53,6 +53,8 @@ def main():
 
   if not paths:
     paths = lines('git','ls-files','*.ipynb')
+
+  print(lines('git','branch','-v','-r'))
 
   print(f'Checking paths: {paths}')
   changed_nbs = lines(['git','diff','--name-only',revision,'--'] + paths)

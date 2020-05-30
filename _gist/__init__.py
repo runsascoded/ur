@@ -9,7 +9,7 @@ from pclass.field import field, directfield
 from git import Repo
 import opts
 
-from regex import maybe, one
+from rgxs import maybe, one
 
 file_chars = '[A-Za-z0-9_\-\.]+'
 chars = '[A-Za-z0-9_\-]+'

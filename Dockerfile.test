@@ -1,0 +1,7 @@
+FROM python:3.8
+RUN pip install --upgrade pip
+RUN pip install jupyter papermill
+RUN python -m ipykernel install --name 3.8.2
+WORKDIR ur
+ENTRYPOINT [ "papermill", "-k", "3.8.2", "runtests.ipynb" ]
+CMD [ "rantests.ipynb" ]

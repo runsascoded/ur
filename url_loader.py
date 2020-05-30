@@ -15,7 +15,7 @@ from cells import CellDeleter
 # Injects an `Importer`!
 from gists import importer
 import opts
-from regex import maybe
+from rgxs import maybe
 
 
 def merge(l, r, *keys):

@@ -1,3 +1,6 @@
 [submodule "mutating-notebook-test"]
 	path = mutating-notebook-test
 	url = git@gist.github.com:aca1060cb371eb93eb14bb07ee68e4eb.git
+[submodule "examples/abcd_gist"]
+	path = examples/abcd_gist
+	url = https://gist.github.com/1288bff2f9e05394a94312010da267bb.git

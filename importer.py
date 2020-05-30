@@ -210,9 +210,12 @@ class Importer:
 
                 # Temporarily add a local notebook loader rooted at the Gist's root, so that local imports within the Gist resolve
                 from local_importer import NotebookFinder
-                finder = NotebookFinder(str(commit.gist.clone_dir))
+                clone_dir = str(commit.gist.clone_dir)
+                finder = NotebookFinder(clone_dir)
                 prev_meta_path = sys.meta_path.copy()
+                prev_path = sys.path.copy()
                 try:
+                    sys.path = [clone_dir] + sys.path
                     sys.meta_path += [ finder ]
                     [ self.exec_module(file_mod) for file_mod in file_mods ]
                 finally:
@@ -220,8 +223,14 @@ class Importer:
                     [ pos ] = [ idx for idx, loader in enumerate(sys.meta_path) if loader is finder ]
                     if len(prev_meta_path) + 1 != len(sys.meta_path) or \
                         pos != len(prev_meta_path):
-                        stderr.write(f'Unexpected meta_path change while executing module {file_mod}: {len(prev_meta_path)} → {len(sys.meta_path)} entries, new loader at position {pos}\n')
+                        stderr.write(f'Unexpected sys.meta_path change while executing module {file_mod}: {len(prev_meta_path)} → {len(sys.meta_path)} entries, new loader at position {pos}\n')
                     sys.meta_path.pop(pos)
+
+                    [ pos ] = [ idx for idx, path in enumerate(sys.path) if path == clone_dir ]
+                    if len(prev_path) + 1 != len(sys.path) or \
+                        pos != 0:
+                        stderr.write(f'Unexpected sys.path change while executing module {file_mod}: {len(prev_path)} → {len(sys.path)} entries, new entry at position {pos}\n')
+                    sys.path.pop(pos)
         else:
             self.print(f'Attempt to exec module {name}')
             if file.name.endswith('.py'):

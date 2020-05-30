@@ -48,6 +48,11 @@ def find_notebook(fullname, path=None):
             #print(f'Found notebook: {nb_path}')
             return nb_path
 
+        # py_path = os.path.join(d, name + ".py")
+        # if os.path.isfile(py_path):
+        #     #print(f'Found notebook: {nb_path}')
+        #     return py_path
+
 
 class NotebookLoader(object):
     """ Module Loader for Jupyter Notebooks. """
@@ -60,10 +65,9 @@ class NotebookLoader(object):
         """import a notebook as a module"""
         path = find_notebook(spec.name, self.path)
 
-        # load the notebook object
-        nb_version = nbformat.version_info[0]
-
         with io.open(path, 'r', encoding=options['encoding']) as f:
+            # load the notebook object
+            nb_version = nbformat.version_info[0]
             nb = nbformat.read(f, nb_version)
 
         # create the module and add it to sys.modules

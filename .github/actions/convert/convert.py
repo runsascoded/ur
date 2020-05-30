@@ -3,16 +3,20 @@ from pathlib import Path
 from subprocess import check_call, check_output, CalledProcessError
 
 
-def lines(*cmd):
+def lines(*cmd, keep_trailing_newline=False):
   print(f'Runnig: {cmd}')
   if len(cmd) == 1 and (isinstance(cmd[0], list) or isinstance(cmd[0], tuple)):
     cmd = cmd[0]
-  return [
+  lines = [
     line.strip()
     for line in
     check_output(cmd).decode().split('\n')
   ]
 
+  if not keep_trailing_newline and lines and not lines[-1]:
+    lines = lines[:-1]
+
+  return lines
 
 def run(*cmd):
   print(f'Running: {cmd}')
@@ -47,12 +51,6 @@ def main():
         raise ValueError(f'First "--" at position {idx} (expected 0)')
       paths = paths[1:]
 
-  remote = args.remote
-  if not args.remote:
-    print('Looking for remote:')
-    print('\n'.join(lines('git','remote','-vv')))
-    [remote] = lines('git','remote')
-
   if not paths:
     paths = lines('git','ls-files','*.ipynb')
 
@@ -73,11 +71,11 @@ def main():
 
   if updates:
     print(f'Found {fmt} files that need updating: {updates}')
-    # remote = args.remote
-    # if not args.remote:
-    #   print('Looking for remote:')
-    #   print('\n'.join(lines('git','remote','-vv')))
-    #   [remote] = lines('git','remote')
+    remote = args.remote
+    if not args.remote:
+      print('Looking for remote:')
+      print('\n'.join(lines('git','remote','-vv')))
+      [remote] = lines('git','remote')
 
     branch = args.branch
 

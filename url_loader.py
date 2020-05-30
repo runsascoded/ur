@@ -117,62 +117,24 @@ class URLLoader:
                 raise NotImplementedError
             elif domain == 'gitlab.com':
                 raise NotImplementedError
-            else:
-                raise Exception(f'Unsupported URL: {path}')
+            elif match(r'https?', url.scheme):
+                from url import URL
+                url = URL(path)
+                url.content
+                path = url._dir / 'content'
+                print(f'Forwarding dir {path} for url {url}')
+                mod = importer.exec_path(path)
         else:
-            # load a local notebook
-            nb_version = nbformat.version_info[0]
-            with open(path, 'r', encoding=opts.encoding) as f:
-                nb = nbformat.read(f, nb_version)
-
-            # create the module and add it to sys.modules
-            mod = ModuleType(path)
-            mod.__file__ = path
-            mod.__loader__ = self
-            mod.__dict__['get_ipython'] = get_ipython
-
-            # Only do something if it's a python notebook
-            if nb.metadata.kernelspec.language != 'python': return
-
-            sys.modules[path] = mod
-
-            # extra work to ensure that magics that would affect the user_ns
-            # actually affect the notebook module's ns
-            save_user_ns = self.shell.user_ns
-            self.shell.user_ns = mod.__dict__
-
-            try:
-                deleter = CellDeleter()
-                for cell in filter(lambda c: c.cell_type == 'code', nb.cells):
-                    # transform the input into executable Python
-                    code = self.shell.input_transformer_manager.transform_cell(cell.source)
-                    if opts.only_defs:
-                        log(f'defs only')
-                        # Remove anything that isn't a def or a class
-                        tree = deleter.generic_visit(ast.parse(code))
-                    else:
-                        log(f'all symbols!')
-                        tree = ast.parse(code)
-                    # run the code in the module
-                    codeobj = compile(tree, filename=path, mode='exec')
-                    exec(codeobj, mod.__dict__)
-            finally:
-                self.shell.user_ns = save_user_ns
-
-            # Run any initialisation if available, but only once
-            if opts.run_nbinit and '__nbinit_done__' not in mod.__dict__:
-                if hasattr(mod, '__nbinit__'):
-                    mod.__nbinit__()
-                    mod.__nbinit_done__ = True
+            mod = importer.exec_path(path)
 
         if not names and not all: return mod
 
-        mod_dict = mod.__dict__
+        dct = mod.__dict__
 
         if hasattr(mod, '__all__'):
             members = mod.__all__
         else:
-            members = [ name for name in mod_dict if not name.startswith('_') ]
+            members = [ name for name in dct if not name.startswith('_') ]
 
         import_all = '*' in names or all is True or all == '*'
         if import_all:
@@ -186,7 +148,7 @@ class URLLoader:
             members = names
 
         log(f'Bubbling up {members}')
-        update = { name: mod_dict[name] for name in members }
+        update = { name: dct[name] for name in members }
         stk = stack()
         cur_file = stk[0].filename
         cur_dir = Path(cur_file).parent
@@ -194,4 +156,3 @@ class URLLoader:
         log(f'Frame: {frame_info}, {frame_info.filename}')
         frame_info.frame.f_globals.update(update)
         return mod
-

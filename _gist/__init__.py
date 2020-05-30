@@ -149,6 +149,11 @@ class Gist(metaclass=Meta):
         WWW_URL_PATH_REGEX,
         RAW_URL_PATH_REGEX,
     ]
+    ID_LEN = 32
+
+    def __init__(self):
+        if not match(r'[0-9a-f]{%d}' % self.ID_LEN, self.id):
+            raise ValueError(f'Unrecognized Gist id: {self.id}')
 
     @classmethod
     def from_url(cls, url, throw=True):

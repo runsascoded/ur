@@ -4,6 +4,8 @@ from IPython.core.interactiveshell import InteractiveShell
 from IPython import get_ipython
 import nbformat
 from os import environ as env
+from pathlib import Path
+from re import match
 import sys
 from sys import stderr
 from types import ModuleType
@@ -25,6 +27,78 @@ class Importer:
     def print(self, *args, **kwargs):
         if opts.verbose:
             self._print(*args, **kwargs)
+
+    def exec_path(self, path, mod=None):
+        import _gist
+
+        # load the notebook
+        nb_version = nbformat.version_info[0]
+        if isinstance(path, Path):
+            with path.open('r', encoding=opts.encoding) as f:
+                nb = nbformat.read(f, nb_version)
+        elif isinstance(path, str):
+            with open(path, 'r', encoding=opts.encoding) as f:
+                nb = nbformat.read(f, nb_version)
+        elif isinstance(path, _gist.File):
+            nb = nbformat.read(path.data_stream, nb_version)
+        else:
+            raise ValueError(f'Unrecognized file type: {path} ({type(path)})')
+
+        # Only do something if it's a python notebook
+        if nb.metadata.kernelspec.language != 'python':
+            self.print("Ignoring '%s': not a python notebook." % file)
+            return
+
+        if mod is None:
+            # create the module and add it to sys.modules
+            mod = ModuleType(str(path))
+            mod.__file__ = str(path)
+            mod.__loader__ = self
+            mod.__dict__['get_ipython'] = get_ipython
+
+            sys.modules[path] = mod
+            dct = mod.__dict__
+
+            self.exec_nb(nb, mod)
+        else:
+            self.exec_nb(nb, mod)
+
+        return mod
+
+    def exec_nb(self, nb, mod, only_defs=None):
+        if only_defs is None: only_defs = opts.only_defs
+
+        dct = mod.__dict__
+
+        # extra work to ensure that magics that would affect the user_ns
+        # actually affect the notebook module's ns
+        save_user_ns = self.shell.user_ns
+        self.shell.user_ns = dct
+
+        try:
+            deleter = CellDeleter()
+            for cell in filter(lambda c: c.cell_type == 'code', nb.cells):
+                # transform the input into executable Python
+                code = self.shell.input_transformer_manager.transform_cell(cell.source)
+                if only_defs:
+                    self.print(f'defs only')
+                    # Remove anything that isn't a def or a class
+                    tree = deleter.generic_visit(ast.parse(code))
+                else:
+                    self.print(f'all symbols!')
+                    tree = ast.parse(code)
+                # run the code in the module
+                codeobj = compile(tree, filename=mod.__file__, mode='exec')
+                exec(codeobj, dct)
+        finally:
+            self.shell.user_ns = save_user_ns
+
+        # Run any initialisation if available, but only once
+        if opts.run_nbinit and '__nbinit_done__' not in dct:
+            if hasattr(mod, '__nbinit__'):
+                mod.__nbinit__()
+                mod.__nbinit_done__ = True
+
 
     def find_spec(self, fullname, path=None, target=None, commit=None):
         self.print(f'find_spec: {fullname} {path} {target} (commit? {commit})')
@@ -115,11 +189,12 @@ class Importer:
         self.exec(
             name=spec.name,
             commit=spec._commit,
-            dct=mod.__dict__ ,
+            mod=mod,
             file=spec._file,
         )
 
-    def exec(self, name, commit, dct, file=None):
+    def exec(self, name, commit, mod, file=None):
+        dct = mod.__dict__
         if not file:
             if commit:
                 file_mods = []
@@ -158,44 +233,17 @@ class Importer:
                     self.print(f'Error executing module {name} ({file}\n{code}')
             elif file.name.endswith('.ipynb'):
                 self.print(f'exec notebook: {file}')
-                # load the notebook
-                nb_version = nbformat.version_info[0]
-                nb = nbformat.read(file.data_stream, nb_version)
-
-                # Only do something if it's a python notebook
-                if nb.metadata.kernelspec.language != 'python':
-                    self.print("Ignoring '%s': not a python notebook." % file)
-                    return
-
-                # extra work to ensure that magics that would affect the user_ns
-                # actually affect the notebook module's ns
-                save_user_ns = self.shell.user_ns
-                self.shell.user_ns = dct
-
-                try:
-                    deleter = CellDeleter()
-                    for cell in filter(lambda c: c.cell_type == 'code', nb.cells):
-                        # transform the input into executable Python
-                        code = self.shell.input_transformer_manager.transform_cell(cell.source)
-                        if opts.only_defs:
-                            # Remove anything that isn't a def or a class
-                            tree = deleter.generic_visit(ast.parse(code))
-                        else:
-                            tree = ast.parse(code)
-                        # run the code in the module
-                        codeobj = compile(tree, filename=file.url, mode='exec')
-                        exec(codeobj, dct)
-                finally:
-                    self.shell.user_ns = save_user_ns
+                self.exec_path(file, mod)
 
 
-importer = Importer()
-
-
+# Finder for importing from git repos
+#from importer import Importer
 if not any([ isinstance(importer, Importer) for importer in sys.meta_path ]):
+    importer = Importer()
     sys.meta_path.append(importer)
 
 
+# Finder for importing local notebooks a la nbimporter
 from local_importer import NotebookFinder
 local_importer = NotebookFinder()
 if not any([ isinstance(importer, NotebookFinder) for importer in sys.meta_path ]):

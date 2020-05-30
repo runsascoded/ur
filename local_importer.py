@@ -49,17 +49,6 @@ def find_notebook(fullname, path=None):
             return nb_path
 
 
-class CellDeleter(ast.NodeTransformer):
-    """ Removes all nodes from an AST which are not suitable
-    for exporting out of a notebook. """
-    def visit(self, node):
-        """ Visit a node. """
-        if node.__class__.__name__ in ['Module', 'FunctionDef', 'ClassDef',
-                                       'Import', 'ImportFrom']:
-            return node
-        return None
-
-
 class NotebookLoader(object):
     """ Module Loader for Jupyter Notebooks. """
 
@@ -98,39 +87,8 @@ class NotebookLoader(object):
 
     def exec_module(self, mod):
         #print(f'NotebookLoader.exec_module: {mod}')
-
-        # extra work to ensure that magics that would affect the user_ns
-        # actually affect the notebook module's ns
-        save_user_ns = self.shell.user_ns
-        self.shell.user_ns = mod.__dict__
-
-        nb = mod._nb
-        path = mod.__file__
-
-        try:
-            deleter = CellDeleter()
-            for cell in filter(lambda c: c.cell_type == 'code', nb.cells):
-                # transform the input into executable Python
-                code = self.shell.input_transformer_manager.transform_cell(cell.source)
-                if options['only_defs']:
-                    # Remove anything that isn't a def or a class
-                    tree = deleter.generic_visit(ast.parse(code))
-                else:
-                    tree = ast.parse(code)
-                # run the code in the module
-                codeobj = compile(tree, filename=path, mode='exec')
-                exec(codeobj, mod.__dict__)
-        finally:
-            self.shell.user_ns = save_user_ns
-
-        # Run any initialisation if available, but only once
-        if options['run_nbinit'] and '__nbinit_done__' not in mod.__dict__:
-            try:
-                mod.__nbinit__()
-                mod.__nbinit_done__ = True
-            except (KeyError, AttributeError) as _:
-                pass
-
+        from gists import importer
+        importer.exec_nb(mod._nb, mod)
         return mod
 
 

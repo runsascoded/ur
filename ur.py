@@ -7,7 +7,7 @@ from url_loader import URLLoader
 
 class UrModule(ModuleType):
     '''Wrap the module represented by this file
-    
+
     Allows making it callable, and providing other syntactic sugar (like the `*` operator)
     '''
     def __init__(self, wrapped):

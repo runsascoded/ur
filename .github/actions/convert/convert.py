@@ -58,6 +58,8 @@ def main():
   print('\n'.join(lines('git','remote','-vv')))
   print('\n'.join(lines('env')))
   print('\n'.join(lines('find','.')))
+  with open('.git/FETCH_HEAD', 'r') as f:
+    print(f'FETCH_HEAD: {f.read()}')
 
   print(f'Checking paths: {paths}')
   changed_nbs = lines(['git','diff','--name-only',revision,'--'] + paths)

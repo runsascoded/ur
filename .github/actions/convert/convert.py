@@ -79,29 +79,29 @@ def main():
     #   print('\n'.join(lines('git','remote','-vv')))
     #   [remote] = lines('git','remote')
 
-      branch = args.branch
+    branch = args.branch
 
-      msg = f'CI: update .{fmt} files via nbconvert'
-      user = args.user
-      email = args.email
-      token = args.token
-      repository = args.repository
+    msg = f'CI: update .{fmt} files via nbconvert'
+    user = args.user
+    email = args.email
+    token = args.token
+    repository = args.repository
 
-      if not args.user or not args.email:
-        from requests import get as GET
-        resp = GET('https://api.github.com/user', headers=dict(Authorization=f'token {token}'))
-        resp.raise_for_status()
+    if not args.user or not args.email:
+      from requests import get as GET
+      resp = GET('https://api.github.com/user', headers=dict(Authorization=f'token {token}'))
+      resp.raise_for_status()
 
-        import json
-        u = json.loads(resp.content.decode())
-        user = user or u['login']
-        email = email or u['email']
+      import json
+      u = json.loads(resp.content.decode())
+      user = user or u['login']
+      email = email or u['email']
 
-      run('git','config','user.name',args.user)
-      run('git','config','user.email',args.email)
-      run('git','commit','-a','-m',msg)
-      run('git', 'remote', 'set-url', remote, 'https://x-access-token:{token}@github.com/{args.repository}')
-      run('git','push',remote,f'HEAD:{branch}')
+    run('git','config','user.name',args.user)
+    run('git','config','user.email',args.email)
+    run('git','commit','-a','-m',msg)
+    run('git', 'remote', 'set-url', remote, 'https://x-access-token:{token}@github.com/{args.repository}')
+    run('git','push',remote,f'HEAD:{branch}')
   else:
     print(f'{len(paths)} notebooks already up-to-date')
 

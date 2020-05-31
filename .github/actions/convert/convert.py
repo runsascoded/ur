@@ -55,13 +55,6 @@ def main():
   if not paths:
     paths = lines('git','ls-files','*.ipynb')
 
-  print('\n'.join(lines('git','branch','-v','-r')))
-  print('\n'.join(lines('git','remote','-vv')))
-  print('\n'.join(lines('env')))
-  print('\n'.join(lines('find','.')))
-  with open('.git/FETCH_HEAD', 'r') as f:
-    print(f'FETCH_HEAD: {f.read()}')
-
   print(f'Checking paths: {paths}')
   changed_nbs = lines(['git','diff','--name-only',revision,'--'] + paths)
   if changed_nbs:
@@ -72,7 +65,7 @@ def main():
   else:
     nbs = changed_nbs
 
-  for path in changed_nbs:
+  for path in nbs:
     name = path.rsplit('.', 1)[0]
     out = f'{name}.{fmt}'
     run('jupyter', 'nbconvert', path, '--to', fmt, out )

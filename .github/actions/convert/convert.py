@@ -31,7 +31,7 @@ def main():
   parser.add_argument('-u', '--user', required=False, help='user.name for Git commit')
   parser.add_argument('-e', '--email', required=False, help='user.email for Git commit')
   parser.add_argument('-b', '--branch', help='Current Git branch (and push target for any changes)')
-  parser.add_argument('-f', '--force', help='Run nbconvert on .ipynb files even if they don\'t seem changed since the base revision')
+  parser.add_argument('-f', '--force', action='store_true', help='Run nbconvert on .ipynb files even if they don\'t seem changed since the base revision')
   parser.add_argument('--fmt', default='markdown', help='Format to convert files to (passed to nbconvert; default: markdown)')
   parser.add_argument('--remote', required=False, help='Git remote to push changes to; defaults to the only git remote, where applicable')
   parser.add_argument('path', nargs='*', help='.ipynb paths to convert')

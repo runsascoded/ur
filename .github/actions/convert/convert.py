@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from os import environ as env
 from pathlib import Path
 from subprocess import check_call, check_output, CalledProcessError
 
@@ -38,7 +39,7 @@ def main():
   args = parser.parse_args()
   print(f'args: {args.__dict__}')
 
-  revision = args.revision
+  revision = args.revision or env['GITHUB_BASE_REF']
   fmt = args.fmt
 
   paths = args.path
@@ -80,13 +81,15 @@ def main():
       print('\n'.join(lines('git','remote','-vv')))
       [remote] = lines('git','remote')
 
-    branch = args.branch
+    branch = args.branch or env['GITHUB_HEAD_REF']
 
     msg = f'CI: update .{fmt} files via nbconvert'
     user = args.user
     email = args.email
     token = args.token
-    repository = args.repository
+    repository = args.repository or env['GITHUB_REPOSITORY']
+
+    run('env')
 
     if not args.user or not args.email:
       from requests import get as GET

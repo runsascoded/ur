@@ -31,7 +31,7 @@ jobs:
       uses: ./.github/actions/convert
       id: convert
       with:
-        args: -f -r origin/${{github.base_ref}} -b ${{github.head_ref}} --token ${{secrets.TOKEN}} --repository ${{github.repository}} README.ipynb
+        args: -f --token ${{secrets.TOKEN}} README.ipynb
 
     # Runs a single command using the runners shell
     - name: Build Docker container for testing

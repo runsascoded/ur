@@ -70,10 +70,7 @@ def main():
     to = 'markdown' if fmt == 'md' else fmt
     run('jupyter', 'nbconvert', path, '--to', to )
 
-  try:
-    updates = lines('git','diff','--exit-code','--name-only')
-  except CalledProcessError:
-    updates = []
+  updates = lines('git','diff','--name-only')
 
   if updates:
     print(f'Found {fmt} files that need updating: {updates}')

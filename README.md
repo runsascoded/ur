@@ -1,16 +1,64 @@
 # ur
-*Universal Resources*: import remote Python and Jupyter notebook files, from GitHub Gists, the local filesystem, or arbitrary URLs.
 
-- [Install](#install)
-- [Usage](#usage)
+> *ur- (combining form): primitive, original, or earliest*
+ 
+*Universal Resources*: import remote Python files and Jupyter notebooks, from GitHub Gists, the local filesystem, or arbitrary URLs.
+
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Import From</th>
+      <th>Gists</th>
+      <th>URLs</th>
+      <th>Local files</th>
+      <th>GitHub</th>
+      <th>GitLab</th>
+    </tr>
+    <tr>
+      <th>File Type</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>Notebook (.ipynb)</th>
+      <td>✅</td>
+      <td>✅</td>
+      <td>✅</td>
+      <td>🚧</td>
+      <td>🚧</td>
+    </tr>
+    <tr>
+      <th>Python (.py)</th>
+      <td>✅</td>
+      <td>✅</td>
+      <td>✅</td>
+      <td>🚧</td>
+      <td>🚧</td>
+    </tr>
+  </tbody>
+</table>
+
+--------
+
+- [**Install**](#install)
+- [**Usage**](#usage)
   - [Import GitHub Gists](#gists)
   - [Import arbitrary URLs](#urls)
   - [Configuration: `ur.opts`](#configs)
-- [Discussion](#discussion)
+- [**Discussion**](#discussion)
   - ["package-less publishing"](#package-less)
   - ["anyone with the link can view" git repositories](#link-visibility)
   - [Use-case: portable, shareable "dotfiles"](#dotfiles)
   - [Future work](#future-work)
+    - [Customize import behavior](#Customize-import-behavior)
+    - [Usability](#Usability)
+    - [Import Sources](#Import-Sources)
+    - [Project Management](#Project-Management)
 
 ## Install: <a id="install"></a>
 
@@ -187,12 +235,31 @@ from gists.abcdef0123456789abcdef0123456789 import *
 ```
 
 ### Future work <a id="future-work"></a>
-- pretty-print info about what's imported (in notebook environments)
-- test/handle intra-gist imports
-- test/handle pip dependencies in gist imports
-- support github / gitlab imports
-- API for tagging/skipping cells in notebooks (visualizations, tests, etc.)
-- Support Jupyter versions >4
-- Minimize(+freeze!) [dependencies](./setup.py)
-- proper logging
-- self-host (put code in notebooks in gists, implement subsequent versions of `ur` using earlier versions of `ur` to import from remote, package-less locations)
+
+#### Customize import behavior
+- [x] test/handle intra-gist imports
+- [ ] test/handle pip dependencies in gist imports
+- [ ] API for tagging/skipping cells in notebooks (visualizations, tests, etc.)
+- [ ] work with `importlib.reload`
+- [ ] support `__init__.ipynb` (automatically load notebook when loading Gist), `__all__` (configure `import *` behavior)
+- [ ] more nuanced TTL / `skip_cache` behavior (e.g. let cached URLs time-out appropriately based on HTTP headers, a la [`requests-cache`](https://pypi.org/project/requests-cache/))
+
+#### Usability
+- [ ] pretty-print info about what's imported (in notebook environments)
+- proper logging:
+  - [ ] support `dict` for `opts.verbose`
+  - [ ] colorized / rich log rendering (incl. HTML in notebook environments)
+
+#### Import Sources
+- [ ] support github / gitlab imports
+- [ ] Support Jupyter versions >4
+
+#### Project Management
+- [ ] Minimize(+freeze!) [dependencies](./setup.py)
+- Self-hosting:
+  - [ ] put code in notebooks
+  - [ ] mirror repository in a Gist
+  - [ ] implement subsequent versions of `ur` using earlier versions of `ur` (importing from remote, package-less locations)
+- [ ] run `*-test.ipynb` notebooks as tests
+- [ ] set up CI
+- [ ] generate `README.md` from `README.ipynb` with pre-commit hook

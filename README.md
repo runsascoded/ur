@@ -61,6 +61,10 @@
     - [Project Management](#Project-Management)
 
 ## Install: <a id="install"></a>
+```bash
+pip install ur
+```
+Or, in a Jupyter notebook:
 
 
 ```python

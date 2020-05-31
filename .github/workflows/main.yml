@@ -21,7 +21,7 @@ jobs:
     - name: nbconvert README
       uses: runsascoded/nbconvert@master
       with:
-        args: -f --token ${{secrets.GITHUB_TOKEN}} README.ipynb
+        args: -f --token ${{secrets.GITHUB_TOKEN}} -s ${{secrets}} README.ipynb
 
     - name: Build Docker container for testing
       run: docker build -f Dockerfile.test -t ur-test .

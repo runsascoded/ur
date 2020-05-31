@@ -252,7 +252,7 @@ from gists.abcdef0123456789abcdef0123456789 import *
 
 #### Import Sources
 - [ ] support github / gitlab imports
-- [ ] Support Jupyter versions >4
+- [ ] Support `nbformat`/Jupyter versions >4
 
 #### Project Management
 - [ ] Minimize(+freeze!) [dependencies](./setup.py)
@@ -260,7 +260,7 @@ from gists.abcdef0123456789abcdef0123456789 import *
   - [ ] put code in notebooks
   - [ ] mirror repository in a Gist
   - [ ] implement subsequent versions of `ur` using earlier versions of `ur` (importing from remote, package-less locations)
-- [ ] run `*-test.ipynb` notebooks as tests
-- [ ] set up CI
-- [ ] generate `README.md` from `README.ipynb` with pre-commit hook
+- [x] run `*-test.ipynb` notebooks as tests
+- [x] set up CI
+- [x] generate `README.md` from `README.ipynb` with pre-commit hook
 - [ ] convert/copy all of these TODOs GitHub into issues!

@@ -28,7 +28,7 @@ jobs:
         git fetch --depth=1 origin +refs/heads/${{github.base_ref}}:refs/remotes/origin/${{github.base_ref}}
         git fetch --depth=1 origin +refs/heads/${{github.head_ref}}:refs/remotes/origin/${{github.head_ref}}
     - name: nbconvert README
-      uses: runsascoded/nbconvert
+      uses: runsascoded/nbconvert@master
       with:
         args: -f --token ${{secrets.TOKEN}} README.ipynb
 

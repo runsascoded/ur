@@ -19,7 +19,7 @@ jobs:
         git fetch --depth=1 origin +refs/heads/${{github.head_ref}}:refs/remotes/origin/${{github.head_ref}}
 
     - name: nbconvert README
-      uses: runsascoded/nbconvert
+      uses: runsascoded/nbconvert@master
 
     - name: Build Docker container for testing
       run: docker build -f Dockerfile.test -t ur-test .

@@ -98,8 +98,8 @@ def main():
       user = user or u['login']
       email = email or u['email']
 
-    run('git','config','user.name',args.user)
-    run('git','config','user.email',args.email)
+    run('git','config','user.name',user)
+    run('git','config','user.email',email)
     run('git','commit','-a','-m',msg)
     run('git', 'remote', 'set-url', remote, 'https://x-access-token:{token}@github.com/{args.repository}')
     run('git','push',remote,f'HEAD:{branch}')

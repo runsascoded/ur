@@ -39,7 +39,13 @@ def main():
   args = parser.parse_args()
   print(f'args: {args.__dict__}')
 
-  revision = args.revision or env['GITHUB_BASE_REF']
+  remote = args.remote
+  if not args.remote:
+    print('Looking for remote:')
+    print('\n'.join(lines('git','remote','-vv')))
+    [remote] = lines('git','remote')
+
+  revision = args.revision or '%s/%s' % (remote, env['GITHUB_BASE_REF'])
   fmt = args.fmt
 
   paths = args.path
@@ -75,11 +81,6 @@ def main():
 
   if updates:
     print(f'Found {fmt} files that need updating: {updates}')
-    remote = args.remote
-    if not args.remote:
-      print('Looking for remote:')
-      print('\n'.join(lines('git','remote','-vv')))
-      [remote] = lines('git','remote')
 
     branch = args.branch or env['GITHUB_HEAD_REF']
 

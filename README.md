@@ -263,3 +263,4 @@ from gists.abcdef0123456789abcdef0123456789 import *
 - [ ] run `*-test.ipynb` notebooks as tests
 - [ ] set up CI
 - [ ] generate `README.md` from `README.ipynb` with pre-commit hook
+- [ ] convert/copy all of these TODOs GitHub into issues!

@@ -101,7 +101,7 @@ def main():
     run('git','config','user.name',user)
     run('git','config','user.email',email)
     run('git','commit','-a','-m',msg)
-    run('git', 'remote', 'set-url', remote, 'https://x-access-token:{token}@github.com/{args.repository}')
+    run('git', 'remote', 'set-url', remote, f'https://x-access-token:{token}@github.com/{args.repository}')
     run('git','push',remote,f'HEAD:{branch}')
   else:
     print(f'{len(paths)} notebooks already up-to-date')

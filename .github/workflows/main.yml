@@ -1,7 +1,5 @@
-name: CI
+name: Refresh .md's
 on:
-  push:
-    branches: [ master ]
   pull_request:
     branches: [ master ]
 
@@ -9,17 +7,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Check out repository
+      uses: actions/checkout@v2
       with:
         ref: ${{ github.head_ref }}
 
-    - name: Fetch origin/master
-      run: |
-        git fetch --depth=1 origin +refs/heads/${{github.base_ref}}:refs/remotes/origin/${{github.base_ref}}
-        git fetch --depth=1 origin +refs/heads/${{github.head_ref}}:refs/remotes/origin/${{github.head_ref}}
-
     - name: nbconvert README
-      uses: runsascoded/nbconvert@v1.1
+      uses: runsascoded/nbconvert@v1.2
+      with:
+        args: -x -f
 
     - name: Build Docker container for testing
       run: docker build -f Dockerfile.test -t ur-test .

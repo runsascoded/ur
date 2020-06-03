@@ -72,6 +72,9 @@ from sys import executable as python
 !{python} -m pip install -q ur
 ```
 
+    [33mWARNING: The directory '/github/home/.cache/pip' or its parent directory is not owned or is not writable by the current user. The cache has been disabled. Check the permissions and owner of that directory. If executing pip with sudo, you may want sudo's -H flag.[0m
+
+
 ## Usage <a id="usage"></a>
 
 ### Import GitHub Gists <a id="gists"></a>
@@ -81,6 +84,9 @@ from sys import executable as python
 from gist._1288bff2f9e05394a94312010da267bb import *
 a_b.a(), a_b.b(), c.c()
 ```
+
+    Cloning https://gist.github.com/1288bff2f9e05394a94312010da267bb into .objs/Gist/1288bff2f9e05394a94312010da267bb/clone
+
 
 
 

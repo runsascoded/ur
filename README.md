@@ -79,9 +79,15 @@ Or, in a Jupyter notebook:
 
 ```python
 from sys import executable as python
+!ls -ld
+!ls -ld /github/home
+!whoami
 !{python} -m pip install -q ur
 ```
 
+    drwxr-xr-x 13 1001 116 4096 Jun  3 21:03 .
+    drwxr-xr-x 3 1001 116 4096 Jun  3 21:03 /github/home
+    root
     [33mWARNING: The directory '/github/home/.cache/pip' or its parent directory is not owned or is not writable by the current user. The cache has been disabled. Check the permissions and owner of that directory. If executing pip with sudo, you may want sudo's -H flag.[0m
 
 

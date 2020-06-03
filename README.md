@@ -4,43 +4,53 @@
  
 *Universal Resources*: import remote Python files and Jupyter notebooks, from GitHub Gists, the local filesystem, or arbitrary URLs.
 
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th>Import From</th>
-      <th>Gists</th>
-      <th>URLs</th>
-      <th>Local files</th>
-      <th>GitHub</th>
-      <th>GitLab</th>
-    </tr>
-    <tr>
-      <th>File Type</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>Notebook (.ipynb)</th>
-      <td>✅</td>
-      <td>✅</td>
-      <td>✅</td>
-      <td>🚧</td>
-      <td>🚧</td>
-    </tr>
-    <tr>
-      <th>Python (.py)</th>
-      <td>✅</td>
-      <td>✅</td>
-      <td>✅</td>
-      <td>🚧</td>
-      <td>🚧</td>
-    </tr>
-  </tbody>
+<table>
+  <tr>
+    <th colspan="2" rowspan="2"></th>
+    <th colspan="5" align="center" style="text-align:center">
+      <b>Import From</b>
+    </th>
+  </tr>
+  <tr>
+    <th>
+      <b>Gists</b>
+    </th>
+    <th>
+      <b>URLs</b>
+    </th>
+    <th>
+      <b>Local files</b>
+    </th>
+    <th>
+      <b>GitHub</b>
+    </th>
+    <th>
+      <b>GitLab</b>
+    </th>
+  </tr>
+  <tr>
+    <td rowspan="2">
+      <b>File Type</b>
+    </td>
+    <td align="right">
+      <b>Notebook (.ipynb)</b>
+    </td>
+    <td align="right">✅</td>
+    <td align="right">✅</td>
+    <td align="right">✅</td>
+    <td align="right">🚧</td>
+    <td align="right">🚧</td>
+  </tr>
+  <tr>
+    <td align="right">
+      <b>Python (.py)</b>
+    </td>
+    <td align="right">✅</td>
+    <td align="right">✅</td>
+    <td align="right">✅</td>
+    <td align="right">🚧</td>
+    <td align="right">🚧</td>
+  </tr>
 </table>
 
 --------

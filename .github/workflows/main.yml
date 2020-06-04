@@ -13,7 +13,7 @@ jobs:
         ref: ${{ github.head_ref }}
 
     - name: nbconvert README
-      uses: runsascoded/nbconvert@v1.2
+      uses: runsascoded/nbconvert
       with:
         args: -x -f
 

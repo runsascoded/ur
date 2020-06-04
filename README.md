@@ -78,10 +78,28 @@ Or, in a Jupyter notebook:
 
 
 ```python
+from os import environ as env
+env['HOME']
+```
+
+
+
+
+    '/github/home'
+
+
+
+
+```python
 from sys import executable as python
+!{python} -m pip --version
+!{python} -m pip cache dir
 !{python} -m pip install ur
 ```
 
+    pip 20.1.1 from /usr/local/lib/python3.8/site-packages/pip (python 3.8)
+    [33mWARNING: The directory '/github/home/.cache/pip' or its parent directory is not owned or is not writable by the current user. The cache has been disabled. Check the permissions and owner of that directory. If executing pip with sudo, you may want sudo's -H flag.[0m
+    [31mERROR: pip cache commands can not function since cache is disabled.[0m
     [33mWARNING: The directory '/github/home/.cache/pip' or its parent directory is not owned or is not writable by the current user. The cache has been disabled. Check the permissions and owner of that directory. If executing pip with sudo, you may want sudo's -H flag.[0m
     Collecting ur
       Downloading ur-0.1.3.tar.gz (18 kB)
@@ -90,83 +108,83 @@ from sys import executable as python
     Requirement already satisfied: nbformat==4.4.0 in /usr/local/lib/python3.8/site-packages (from ur) (4.4.0)
     Collecting GitPython
       Downloading GitPython-3.1.3-py3-none-any.whl (451 kB)
-    [K     |████████████████████████████████| 451 kB 11.8 MB/s 
+    [K     |████████████████████████████████| 451 kB 5.6 MB/s 
     [?25hCollecting lxml
       Downloading lxml-4.5.1-cp38-cp38-manylinux1_x86_64.whl (5.4 MB)
-    [K     |████████████████████████████████| 5.4 MB 42.5 MB/s 
+    [K     |████████████████████████████████| 5.4 MB 34.0 MB/s 
     [?25hCollecting cssselect
       Downloading cssselect-1.1.0-py2.py3-none-any.whl (16 kB)
-    Collecting notebook
-      Downloading notebook-6.0.3-py3-none-any.whl (9.7 MB)
-    [K     |████████████████████████████████| 9.7 MB 97.3 MB/s 
-    [?25hRequirement already satisfied: nbconvert in /usr/local/lib/python3.8/site-packages (from jupyter->ur) (5.6.1)
-    Collecting jupyter-console
-      Downloading jupyter_console-6.1.0-py2.py3-none-any.whl (21 kB)
+    Requirement already satisfied: nbconvert in /usr/local/lib/python3.8/site-packages (from jupyter->ur) (5.6.1)
     Collecting qtconsole
       Downloading qtconsole-4.7.4-py2.py3-none-any.whl (118 kB)
-    [K     |████████████████████████████████| 118 kB 101.3 MB/s 
-    [?25hCollecting ipywidgets
+    [K     |████████████████████████████████| 118 kB 69.7 MB/s 
+    [?25hCollecting jupyter-console
+      Downloading jupyter_console-6.1.0-py2.py3-none-any.whl (21 kB)
+    Collecting ipywidgets
       Downloading ipywidgets-7.5.1-py2.py3-none-any.whl (121 kB)
-    [K     |████████████████████████████████| 121 kB 96.6 MB/s 
+    [K     |████████████████████████████████| 121 kB 71.1 MB/s 
+    [?25hCollecting notebook
+      Downloading notebook-6.0.3-py3-none-any.whl (9.7 MB)
+    [K     |████████████████████████████████| 9.7 MB 21.2 MB/s 
     [?25hRequirement already satisfied: ipykernel in /usr/local/lib/python3.8/site-packages (from jupyter->ur) (5.3.0)
-    Requirement already satisfied: jupyter-core in /usr/local/lib/python3.8/site-packages (from nbformat==4.4.0->ur) (4.6.3)
     Requirement already satisfied: jsonschema!=2.5.0,>=2.4 in /usr/local/lib/python3.8/site-packages (from nbformat==4.4.0->ur) (3.2.0)
-    Requirement already satisfied: traitlets>=4.1 in /usr/local/lib/python3.8/site-packages (from nbformat==4.4.0->ur) (4.3.3)
+    Requirement already satisfied: jupyter-core in /usr/local/lib/python3.8/site-packages (from nbformat==4.4.0->ur) (4.6.3)
     Requirement already satisfied: ipython-genutils in /usr/local/lib/python3.8/site-packages (from nbformat==4.4.0->ur) (0.2.0)
+    Requirement already satisfied: traitlets>=4.1 in /usr/local/lib/python3.8/site-packages (from nbformat==4.4.0->ur) (4.3.3)
     Collecting gitdb<5,>=4.0.1
       Downloading gitdb-4.0.5-py3-none-any.whl (63 kB)
-    [K     |████████████████████████████████| 63 kB 34.8 MB/s 
-    [?25hCollecting prometheus-client
-      Downloading prometheus_client-0.8.0-py2.py3-none-any.whl (53 kB)
-    [K     |████████████████████████████████| 53 kB 62.0 MB/s 
-    [?25hCollecting Send2Trash
-      Downloading Send2Trash-1.5.0-py3-none-any.whl (12 kB)
-    Requirement already satisfied: jupyter-client>=5.3.4 in /usr/local/lib/python3.8/site-packages (from notebook->jupyter->ur) (6.1.3)
-    Requirement already satisfied: tornado>=5.0 in /usr/local/lib/python3.8/site-packages (from notebook->jupyter->ur) (6.0.4)
-    Requirement already satisfied: jinja2 in /usr/local/lib/python3.8/site-packages (from notebook->jupyter->ur) (2.11.2)
-    Requirement already satisfied: pyzmq>=17 in /usr/local/lib/python3.8/site-packages (from notebook->jupyter->ur) (19.0.1)
-    Collecting terminado>=0.8.1
-      Downloading terminado-0.8.3-py2.py3-none-any.whl (33 kB)
-    Requirement already satisfied: mistune<2,>=0.8.1 in /usr/local/lib/python3.8/site-packages (from nbconvert->jupyter->ur) (0.8.4)
+    [K     |████████████████████████████████| 63 kB 47.6 MB/s 
+    [?25hRequirement already satisfied: jinja2>=2.4 in /usr/local/lib/python3.8/site-packages (from nbconvert->jupyter->ur) (2.11.2)
     Requirement already satisfied: pygments in /usr/local/lib/python3.8/site-packages (from nbconvert->jupyter->ur) (2.6.1)
+    Requirement already satisfied: mistune<2,>=0.8.1 in /usr/local/lib/python3.8/site-packages (from nbconvert->jupyter->ur) (0.8.4)
     Requirement already satisfied: bleach in /usr/local/lib/python3.8/site-packages (from nbconvert->jupyter->ur) (3.1.5)
     Requirement already satisfied: defusedxml in /usr/local/lib/python3.8/site-packages (from nbconvert->jupyter->ur) (0.6.0)
-    Requirement already satisfied: testpath in /usr/local/lib/python3.8/site-packages (from nbconvert->jupyter->ur) (0.4.4)
     Requirement already satisfied: pandocfilters>=1.4.1 in /usr/local/lib/python3.8/site-packages (from nbconvert->jupyter->ur) (1.4.2)
     Requirement already satisfied: entrypoints>=0.2.2 in /usr/local/lib/python3.8/site-packages (from nbconvert->jupyter->ur) (0.3)
-    Requirement already satisfied: prompt-toolkit!=3.0.0,!=3.0.1,<3.1.0,>=2.0.0 in /usr/local/lib/python3.8/site-packages (from jupyter-console->jupyter->ur) (3.0.5)
-    Requirement already satisfied: ipython in /usr/local/lib/python3.8/site-packages (from jupyter-console->jupyter->ur) (7.15.0)
+    Requirement already satisfied: testpath in /usr/local/lib/python3.8/site-packages (from nbconvert->jupyter->ur) (0.4.4)
+    Requirement already satisfied: jupyter-client>=4.1 in /usr/local/lib/python3.8/site-packages (from qtconsole->jupyter->ur) (6.1.3)
     Collecting qtpy
       Downloading QtPy-1.9.0-py2.py3-none-any.whl (54 kB)
-    [K     |████████████████████████████████| 54 kB 65.9 MB/s 
-    [?25hCollecting widgetsnbextension~=3.5.0
+    [K     |████████████████████████████████| 54 kB 42.2 MB/s 
+    [?25hRequirement already satisfied: pyzmq>=17.1 in /usr/local/lib/python3.8/site-packages (from qtconsole->jupyter->ur) (19.0.1)
+    Requirement already satisfied: ipython in /usr/local/lib/python3.8/site-packages (from jupyter-console->jupyter->ur) (7.15.0)
+    Requirement already satisfied: prompt-toolkit!=3.0.0,!=3.0.1,<3.1.0,>=2.0.0 in /usr/local/lib/python3.8/site-packages (from jupyter-console->jupyter->ur) (3.0.5)
+    Collecting widgetsnbextension~=3.5.0
       Downloading widgetsnbextension-3.5.1-py2.py3-none-any.whl (2.2 MB)
-    [K     |████████████████████████████████| 2.2 MB 94.8 MB/s 
-    [?25hRequirement already satisfied: attrs>=17.4.0 in /usr/local/lib/python3.8/site-packages (from jsonschema!=2.5.0,>=2.4->nbformat==4.4.0->ur) (19.3.0)
-    Requirement already satisfied: six>=1.11.0 in /usr/local/lib/python3.8/site-packages (from jsonschema!=2.5.0,>=2.4->nbformat==4.4.0->ur) (1.15.0)
+    [K     |████████████████████████████████| 2.2 MB 51.3 MB/s 
+    [?25hRequirement already satisfied: tornado>=5.0 in /usr/local/lib/python3.8/site-packages (from notebook->jupyter->ur) (6.0.4)
+    Collecting terminado>=0.8.1
+      Downloading terminado-0.8.3-py2.py3-none-any.whl (33 kB)
+    Collecting Send2Trash
+      Downloading Send2Trash-1.5.0-py3-none-any.whl (12 kB)
+    Collecting prometheus-client
+      Downloading prometheus_client-0.8.0-py2.py3-none-any.whl (53 kB)
+    [K     |████████████████████████████████| 53 kB 40.5 MB/s 
+    [?25hRequirement already satisfied: six>=1.11.0 in /usr/local/lib/python3.8/site-packages (from jsonschema!=2.5.0,>=2.4->nbformat==4.4.0->ur) (1.15.0)
+    Requirement already satisfied: attrs>=17.4.0 in /usr/local/lib/python3.8/site-packages (from jsonschema!=2.5.0,>=2.4->nbformat==4.4.0->ur) (19.3.0)
     Requirement already satisfied: setuptools in /usr/local/lib/python3.8/site-packages (from jsonschema!=2.5.0,>=2.4->nbformat==4.4.0->ur) (46.4.0)
     Requirement already satisfied: pyrsistent>=0.14.0 in /usr/local/lib/python3.8/site-packages (from jsonschema!=2.5.0,>=2.4->nbformat==4.4.0->ur) (0.16.0)
     Requirement already satisfied: decorator in /usr/local/lib/python3.8/site-packages (from traitlets>=4.1->nbformat==4.4.0->ur) (4.4.2)
     Collecting smmap<4,>=3.0.1
       Downloading smmap-3.0.4-py2.py3-none-any.whl (25 kB)
-    Requirement already satisfied: python-dateutil>=2.1 in /usr/local/lib/python3.8/site-packages (from jupyter-client>=5.3.4->notebook->jupyter->ur) (2.8.1)
-    Requirement already satisfied: MarkupSafe>=0.23 in /usr/local/lib/python3.8/site-packages (from jinja2->notebook->jupyter->ur) (1.1.1)
-    Requirement already satisfied: ptyprocess; os_name != "nt" in /usr/local/lib/python3.8/site-packages (from terminado>=0.8.1->notebook->jupyter->ur) (0.6.0)
+    Requirement already satisfied: MarkupSafe>=0.23 in /usr/local/lib/python3.8/site-packages (from jinja2>=2.4->nbconvert->jupyter->ur) (1.1.1)
     Requirement already satisfied: packaging in /usr/local/lib/python3.8/site-packages (from bleach->nbconvert->jupyter->ur) (20.4)
     Requirement already satisfied: webencodings in /usr/local/lib/python3.8/site-packages (from bleach->nbconvert->jupyter->ur) (0.5.1)
-    Requirement already satisfied: wcwidth in /usr/local/lib/python3.8/site-packages (from prompt-toolkit!=3.0.0,!=3.0.1,<3.1.0,>=2.0.0->jupyter-console->jupyter->ur) (0.2.3)
-    Requirement already satisfied: pexpect; sys_platform != "win32" in /usr/local/lib/python3.8/site-packages (from ipython->jupyter-console->jupyter->ur) (4.8.0)
+    Requirement already satisfied: python-dateutil>=2.1 in /usr/local/lib/python3.8/site-packages (from jupyter-client>=4.1->qtconsole->jupyter->ur) (2.8.1)
+    Requirement already satisfied: backcall in /usr/local/lib/python3.8/site-packages (from ipython->jupyter-console->jupyter->ur) (0.1.0)
     Requirement already satisfied: jedi>=0.10 in /usr/local/lib/python3.8/site-packages (from ipython->jupyter-console->jupyter->ur) (0.17.0)
     Requirement already satisfied: pickleshare in /usr/local/lib/python3.8/site-packages (from ipython->jupyter-console->jupyter->ur) (0.7.5)
-    Requirement already satisfied: backcall in /usr/local/lib/python3.8/site-packages (from ipython->jupyter-console->jupyter->ur) (0.1.0)
+    Requirement already satisfied: pexpect; sys_platform != "win32" in /usr/local/lib/python3.8/site-packages (from ipython->jupyter-console->jupyter->ur) (4.8.0)
+    Requirement already satisfied: wcwidth in /usr/local/lib/python3.8/site-packages (from prompt-toolkit!=3.0.0,!=3.0.1,<3.1.0,>=2.0.0->jupyter-console->jupyter->ur) (0.2.3)
+    Requirement already satisfied: ptyprocess; os_name != "nt" in /usr/local/lib/python3.8/site-packages (from terminado>=0.8.1->notebook->jupyter->ur) (0.6.0)
     Requirement already satisfied: pyparsing>=2.0.2 in /usr/local/lib/python3.8/site-packages (from packaging->bleach->nbconvert->jupyter->ur) (2.4.7)
     Requirement already satisfied: parso>=0.7.0 in /usr/local/lib/python3.8/site-packages (from jedi>=0.10->ipython->jupyter-console->jupyter->ur) (0.7.0)
     Building wheels for collected packages: ur
       Building wheel for ur (setup.py) ... [?25l- done
-    [?25h  Created wheel for ur: filename=ur-0.1.3-py3-none-any.whl size=17207 sha256=25a1ef9ef2128df1839344c2fb781e68c9e50bb4cbc6d8e29eb88b35d61b55da
-      Stored in directory: /tmp/pip-ephem-wheel-cache-zvjbyw84/wheels/f5/89/df/4ff2ee970a3439f6fb80f7dfa1f9c43bfac77c9f010e517712
+    [?25h  Created wheel for ur: filename=ur-0.1.3-py3-none-any.whl size=17207 sha256=bc709d36178025921940d520c17ce9b90928dc1c3856964a7a1fe0282482c33e
+      Stored in directory: /tmp/pip-ephem-wheel-cache-a3tqa1pq/wheels/f5/89/df/4ff2ee970a3439f6fb80f7dfa1f9c43bfac77c9f010e517712
     Successfully built ur
-    Installing collected packages: prometheus-client, Send2Trash, terminado, notebook, jupyter-console, qtpy, qtconsole, widgetsnbextension, ipywidgets, jupyter, smmap, gitdb, GitPython, lxml, cssselect, ur
+    Installing collected packages: qtpy, qtconsole, jupyter-console, terminado, Send2Trash, prometheus-client, notebook, widgetsnbextension, ipywidgets, jupyter, smmap, gitdb, GitPython, lxml, cssselect, ur
     Successfully installed GitPython-3.1.3 Send2Trash-1.5.0 cssselect-1.1.0 gitdb-4.0.5 ipywidgets-7.5.1 jupyter-1.0.0 jupyter-console-6.1.0 lxml-4.5.1 notebook-6.0.3 prometheus-client-0.8.0 qtconsole-4.7.4 qtpy-1.9.0 smmap-3.0.4 terminado-0.8.3 ur-0.1.3 widgetsnbextension-3.5.1
 
 

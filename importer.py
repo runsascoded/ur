@@ -29,20 +29,8 @@ class Importer:
             self._print(*args, **kwargs)
 
     def exec_path(self, path, mod=None):
-        import _gist
-
-        # load the notebook
-        nb_version = nbformat.version_info[0]
-        if isinstance(path, Path):
-            with path.open('r', encoding=opts.encoding) as f:
-                nb = nbformat.read(f, nb_version)
-        elif isinstance(path, str):
-            with open(path, 'r', encoding=opts.encoding) as f:
-                nb = nbformat.read(f, nb_version)
-        elif isinstance(path, _gist.File):
-            nb = nbformat.read(path.data_stream, nb_version)
-        else:
-            raise ValueError(f'Unrecognized file type: {path} ({type(path)})')
+        from nb import read_nb
+        nb = read_nb(path)
 
         # Only do something if it's a python notebook
         if nb.metadata.kernelspec.language != 'python':
@@ -104,7 +92,7 @@ class Importer:
         self.print(f'find_spec: {fullname} {path} {target} (commit? {commit})')
 
         path = fullname.split('.')
-        if path[0] not in [ 'gists', 'gist' ]: return
+        if path[0] not in opts.gist_pkgs: return
 
         if len(path) == 1:
             self.print(f'Creating _gist package')
@@ -112,9 +100,7 @@ class Importer:
             spec.__license__ = "CC BY-SA 3.0"
             spec._commit = commit
             spec._file = None
-
             spec.submodule_search_locations = []
-
             return spec
 
         id = path[1]

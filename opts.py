@@ -6,3 +6,6 @@ only_defs = True
 run_nbinit = True
 encoding = 'utf-8'
 verbose = False
+gist_pkgs = ['gist','gists']  # top-level packages to parse as importing from GitHub Gists
+github_pkgs = ['github','gh']
+gitlab_pkgs = ['gitlab','gl']

@@ -1,18 +1,80 @@
 # ur
-*Universal Resources*: import remote Python and Jupyter notebook files, from GitHub Gists, the local filesystem, or arbitrary URLs.
 
-- [Install](#install)
-- [Usage](#usage)
+> *ur- (combining form): primitive, original, or earliest*
+ 
+*Universal Resources*: import remote Python files and Jupyter notebooks, from GitHub Gists, the local filesystem, or arbitrary URLs.
+
+<table>
+  <tr>
+    <th colspan="2" rowspan="2"></th>
+    <th colspan="5" align="center" style="text-align:center">
+      <b>Import From</b>
+    </th>
+  </tr>
+  <tr>
+    <th>
+      <b>Gists</b>
+    </th>
+    <th>
+      <b>URLs</b>
+    </th>
+    <th>
+      <b>Local files</b>
+    </th>
+    <th>
+      <b>GitHub</b>
+    </th>
+    <th>
+      <b>GitLab</b>
+    </th>
+  </tr>
+  <tr>
+    <td rowspan="2">
+      <b>File Type</b>
+    </td>
+    <td align="right">
+      <b>Notebook (.ipynb)</b>
+    </td>
+    <td align="right">✅</td>
+    <td align="right">✅</td>
+    <td align="right">✅</td>
+    <td align="right">🚧</td>
+    <td align="right">🚧</td>
+  </tr>
+  <tr>
+    <td align="right">
+      <b>Python (.py)</b>
+    </td>
+    <td align="right">✅</td>
+    <td align="right">✅</td>
+    <td align="right">✅</td>
+    <td align="right">🚧</td>
+    <td align="right">🚧</td>
+  </tr>
+</table>
+
+--------
+
+- [**Install**](#install)
+- [**Usage**](#usage)
   - [Import GitHub Gists](#gists)
   - [Import arbitrary URLs](#urls)
   - [Configuration: `ur.opts`](#configs)
-- [Discussion](#discussion)
+- [**Discussion**](#discussion)
   - ["package-less publishing"](#package-less)
   - ["anyone with the link can view" git repositories](#link-visibility)
   - [Use-case: portable, shareable "dotfiles"](#dotfiles)
   - [Future work](#future-work)
+    - [Customize import behavior](#Customize-import-behavior)
+    - [Usability](#Usability)
+    - [Import Sources](#Import-Sources)
+    - [Project Management](#Project-Management)
 
 ## Install: <a id="install"></a>
+```bash
+pip install ur
+```
+Or, in a Jupyter notebook:
 
 
 ```python
@@ -29,6 +91,9 @@ from sys import executable as python
 from gist._1288bff2f9e05394a94312010da267bb import *
 a_b.a(), a_b.b(), c.c()
 ```
+
+    Cloning https://gist.github.com/1288bff2f9e05394a94312010da267bb into .objs/Gist/1288bff2f9e05394a94312010da267bb/clone
+
 
 
 
@@ -183,16 +248,36 @@ ur(github='ryan-williams/dotfiles', tree='v1.0', file='dotfiles.ipynb', all='*')
 Many versions of this can be used, depending on your preferences, e.g.:
 
 ```python
-from gists.abcdef0123456789abcdef0123456789 import *
+from gist.abcdef0123456789abcdef0123456789 import *
 ```
 
 ### Future work <a id="future-work"></a>
-- pretty-print info about what's imported (in notebook environments)
-- test/handle intra-gist imports
-- test/handle pip dependencies in gist imports
-- support github / gitlab imports
-- API for tagging/skipping cells in notebooks (visualizations, tests, etc.)
-- Support Jupyter versions >4
-- Minimize(+freeze!) [dependencies](./setup.py)
-- proper logging
-- self-host (put code in notebooks in gists, implement subsequent versions of `ur` using earlier versions of `ur` to import from remote, package-less locations)
+
+#### Customize import behavior
+- [x] test/handle intra-gist imports
+- [ ] test/handle pip dependencies in gist imports
+- [ ] API for tagging/skipping cells in notebooks (visualizations, tests, etc.)
+- [ ] work with `importlib.reload`
+- [ ] support `__init__.ipynb` (automatically load notebook when loading Gist), `__all__` (configure `import *` behavior)
+- [ ] more nuanced TTL / `skip_cache` behavior (e.g. let cached URLs time-out appropriately based on HTTP headers, a la [`requests-cache`](https://pypi.org/project/requests-cache/))
+
+#### Usability
+- [ ] pretty-print info about what's imported (in notebook environments)
+- proper logging:
+  - [ ] support `dict` for `opts.verbose`
+  - [ ] colorized / rich log rendering (incl. HTML in notebook environments)
+
+#### Import Sources
+- [ ] support github / gitlab imports
+- [ ] Support `nbformat`/Jupyter versions >4
+
+#### Project Management
+- [ ] Minimize(+freeze!) [dependencies](./setup.py)
+- Self-hosting:
+  - [ ] put code in notebooks
+  - [ ] mirror repository in a Gist
+  - [ ] implement subsequent versions of `ur` using earlier versions of `ur` (importing from remote, package-less locations)
+- [x] run `*-test.ipynb` notebooks as tests
+- [x] set up CI
+- [x] generate `README.md` from `README.ipynb` with pre-commit hook
+- [ ] convert/copy all of these TODOs GitHub into issues!

@@ -5,14 +5,14 @@ with open('README.md', 'r') as f:
 
 setup(
       name='ur',
-      packages=[ 'pclass', 'gists', '_gist', 'gist', ],
+      packages=[ 'pclass', 'gists', '_gist', 'gist', '_github', 'github', ],
       version='0.2.0',
       description='Import remote Jupyter notebooks (or Python files)',
       long_description=long_description,
       long_description_content_type='text/markdown',
       author='Ryan Williams',
       author_email='ryan@runsascoded.com',
-      py_modules=[ 'ur', 'cells', 'local_importer', 'opts', 'regex', 'url_loader', ],
+      py_modules=[ 'ur', 'cells', 'local_importer', 'opts', 'rgxs', 'url_loader', ],
       install_requires=[ 'jupyter', 'nbformat==4.4.0', 'GitPython', 'lxml', 'cssselect', ],
       keywords=[ 'gists', 'imports', 'importlib', 'jupyter', 'notebooks', ],
       license='BSD',

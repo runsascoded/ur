@@ -56,7 +56,7 @@ class File:
     def url(self): return f'https://gist.githubusercontent.com/{self.gist.user}/{self.gist.id}/raw/{self.commit.id}/{self.name}'
 
     @property
-    def web_url(self): return f'https://gist.github.com/{self.gist.user}/{self.gist.id}/{self.commit.id}#{self.fragment}'
+    def www_url(self): return f'https://gist.github.com/{self.gist.user}/{self.gist.id}/{self.commit.id}#{self.fragment}'
 
     @property
     def blob(self):
@@ -74,7 +74,7 @@ class Commit(metaclass=Meta):
         self.gist = gist
 
     @property
-    def url(self): return f'https://gist.github.com/{self.gist.id}/{self.id}'
+    def www_url(self): return f'https://gist.github.com/{self.gist.id}/{self.id}'
 
     @property
     def user(self): return self.gist.user
@@ -90,6 +90,9 @@ class Commit(metaclass=Meta):
 
     @property
     def blobs(self): return self.tree.blobs
+
+    @property
+    def clone_dir(self): return self.gist.clone_dir
 
     @property
     def files(self):
@@ -110,7 +113,7 @@ class Commit(metaclass=Meta):
     ### Cached fields ###
 
     @directfield
-    def xml(self, path): urlretrieve(self.url, path)
+    def xml(self, path): urlretrieve(self.www_url, path)
 
     @xml.load
     def load_xml(self, path):
@@ -213,34 +216,37 @@ class Gist(metaclass=Meta):
         return cls.from_dict(**m)
 
     @classmethod
-    def from_dict(cls, skip_cache=False, **m):
+    def from_dict(
+        cls,
+        id,
+        user=None,
+        commit=None,
+        file=None,
+        fragment=None,
+        raw=None,
+        skip_cache=False,
+    ):
 
-        id = m['id']
         gist = Gist(id, _skip_cache=skip_cache)
 
-        user = m.get('user')
         if user: assert user == gist.user
 
-        _commit = m.get('commit')
-        if _commit:
-            commit = Commit(_commit, gist)
+        if commit:
+            commit = Commit(commit, gist)
         else:
             commit = gist.commit
 
-        _file = m.get('file')
-        fragment = m.get('fragment')
-        if _file:
-            file = commit.files_dict[_file]
+        if file:
+            file = commit.files_dict[file]
         elif fragment:
             name = commit.fragments[fragment]
             file = commit.files_dict[name]
         else:
-            raw = 'raw' in m
-            if raw:
+            if m.get('raw'):
                 files = commit.files
                 if len(files) != 1:
                     raise Exception(
-                    f'File-less "raw" URL pattern disallowed unless gist contains exactly one file; {gist.url} contains {len(files)}%s' % (
+                    f'File-less "raw" URL pattern disallowed unless gist contains exactly one file; {gist.www_url} contains {len(files)}%s' % (
                         ' (%s)' % ', '.join(files) if files else ''
                     ))
                 [ file ] = files
@@ -256,7 +262,10 @@ class Gist(metaclass=Meta):
     def git_url(self): return f'https://gist.github.com/{self.id}'
 
     @property
-    def url(self): return f'https://gist.github.com/{self.id}'
+    def www_url(self): return f'https://gist.github.com/{self.id}'
+
+    @property
+    def ssh_url(self): return f'git@gist.github.com:{self.id}.git'
 
     @property
     def module_name(self):
@@ -264,7 +273,7 @@ class Gist(metaclass=Meta):
         if match('\d', id[0]):
             id = f'_{id}'
 
-        return f'gists.{id}'
+        return f'gist.{id}'
 
     @field
     def user(self):

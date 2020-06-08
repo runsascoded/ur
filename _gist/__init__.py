@@ -94,15 +94,15 @@ class Commit(metaclass=Meta):
     @property
     def clone_dir(self): return self.gist.clone_dir
 
-    # @property
-    # def files(self):
-    #     return [
-    #         File(
-    #             self,
-    #             self.gist.clone_dir / blob.name
-    #         )
-    #         for blob in self.blobs
-    #     ]
+    @property
+    def files(self):
+        return [
+            File(
+                self,
+                self.gist.clone_dir / blob.name
+            )
+            for blob in self.blobs
+        ]
 
     @property
     def files_dict(self): return { file.name: file for file in self.files }

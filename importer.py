@@ -105,7 +105,7 @@ class Importer:
         return self.node_spec(fullname, node, path)
 
     def load_github_spec(self, fullname, top, mod_path):
-        self.print(f'load_github_spec: {fullname=}')
+        self.print(f'load_github_spec: fullname={fullname}')
         if not mod_path:
             self.print(f'Creating top-level "{top}" package')
             return self.spec(fullname, None)
@@ -143,7 +143,7 @@ class Importer:
         return spec
 
     def node_spec(self, fullname, node, mod_path, throw=True):
-        self.print(f'node_spec: {node=}, {mod_path=}')
+        self.print(f'node_spec: node={node}, mod_path={mod_path}')
         full_path = mod_path
         while mod_path:
             [ name, *mod_path ] = mod_path
@@ -174,11 +174,11 @@ class Importer:
         else:
             raise ValueError(node)
 
-        self.print(f'Creating package spec {fullname} from {node} ({origin=})')
+        self.print(f'Creating package spec {fullname} from {node} (origin={origin})')
         return self.spec(fullname, node, origin=origin, pkg=node.is_dir)
 
     def find_spec(self, fullname, path=None, target=None, mod_path=None):
-        self.print(f'Importer.find_spec: {fullname=} {path=} {target=} {mod_path=}')
+        self.print(f'Importer.find_spec: fullname={fullname} path={path} target={target} mod_path={mod_path}')
         assert not target
         # if path and not isinstance(path, Node):
         #     raise AssertionError(f'path not a Node: {path}')
@@ -251,7 +251,7 @@ class Importer:
             return basename
 
     def exec(self, name, mod, node, root_path=None):
-        self.print(f'exec: {name=} {mod=} {node=} {root_path=}')
+        self.print(f'exec: name={name} mod={mod} node={node} root_path={root_path}')
         dct = mod.__dict__
         if not node: return
         if node.is_dir:
@@ -287,7 +287,7 @@ class Importer:
                 for file_mod in file_mods
             ]
         else:
-            self.print(f'Attempt to exec module {name} ({root_path=})')
+            self.print(f'Attempt to exec module {name} (root_path={root_path})')
             #assert root_path
             if root_path:
                 ctx = self.tmp_path(root_path)

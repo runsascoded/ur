@@ -1,6 +1,6 @@
 import ast
 from collections.abc import Iterable
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from importlib._bootstrap import spec_from_loader
 from importlib.machinery import ModuleSpec
 from IPython.core.interactiveshell import InteractiveShell
@@ -84,13 +84,13 @@ class Importer:
         if not mod_path:
             # TODO: dedupe multiple top-level aliases
             self.print(f'Creating top-level "{top}" package')
-            return self.spec(fullname, path=None)
+            return self.spec(fullname, node=None)
 
         [ id, *mod_path ] = mod_path
         if id.startswith('_'):
             id = id[1:]
 
-        from _gist import Commit, Gist
+        from _gist import Gist
 
         self.print(f'Gist {id}: skip_cache={opts.skip_cache}')
         gist = Gist(id, _skip_cache=opts.skip_cache)
@@ -108,7 +108,7 @@ class Importer:
         self.print(f'load_github_spec: {fullname=}')
         if not mod_path:
             self.print(f'Creating top-level "{top}" package')
-            return self.spec(fullname)
+            return self.spec(fullname, None)
 
         [ org, *mod_path ] = mod_path
         if org.startswith('_'): org = org[1:]
@@ -116,19 +116,19 @@ class Importer:
 
         if not mod_path:
             self.print(f'Creating GitHub org/user "{top}.{org}" package')
-            return self.spec(fullname)
+            return self.spec(fullname, None)
 
         [ repo, *mod_path ] = mod_path
         if repo.startswith('_'): repo = repo[1:]
         repo = repo.replace('_','-')
 
-        from _github import Commit, Github, Path
+        from _github import Github
 
         id = f'{org}/{repo}'
         self.print(f'GitHub repo {id}: skip_cache={opts.skip_cache}')
         github = Github(id, _skip_cache=opts.skip_cache)
         commit = github.commit
-        node = GitPath(commit)
+        node = GitNode(commit)
 
         if not mod_path:
             self.print(f'Building module/pkg for github repo {id}, mod_path {mod_path})')
@@ -168,7 +168,7 @@ class Importer:
                 return None
 
         if isinstance(node, GitNode):
-            origin = node.obj.www_url
+            origin = str(node.url)
         elif isinstance(node, PathNode):
             origin = str(node.path)
         else:
@@ -201,7 +201,7 @@ class Importer:
                 path = [ PathNode(Path.cwd()) ]
 
             for node in path:
-                node_spec = self.node_spec(fullname, node, mod_path)
+                node_spec = self.node_spec(fullname, node, mod_path, throw=False)
                 if node_spec:
                     return node_spec
 
@@ -253,11 +253,21 @@ class Importer:
     def exec(self, name, mod, node, root_path=None):
         self.print(f'exec: {name=} {mod=} {node=} {root_path=}')
         dct = mod.__dict__
+        if not node: return
         if node.is_dir:
             if not root_path: root_path = [node]
             mod_name = name
+            children = node.children
+            if '__init__.py' in children:
+                self.print(f'{mod}: executing __init__.py')
+                self.exec(name, mod, children['__init__.py'], root_path=root_path)
+
+            if '__all__' in mod.__dict__:
+                children = { k: children[k] for k in mod.__dict__['__all__'] }
+                print(f'{mod}: restricting children based on __all__: {list(children.keys())}')
+
             file_mods = []
-            for name, child in node.children.items():
+            for name, child in children.items():
                 mod_basename = self.mod_basename(name)
                 if not mod_basename: continue
                 fullname = f'{mod_name}.{mod_basename}'
@@ -278,7 +288,11 @@ class Importer:
         else:
             self.print(f'Attempt to exec module {name} ({root_path=})')
             #assert root_path
-            with self.tmp_path(root_path):
+            if root_path:
+                ctx = self.tmp_path(root_path)
+            else:
+                ctx = nullcontext()
+            with ctx:
                 if node.name.endswith('.py'):
                     self.print(f'exec .py file: {node}')
                     code = node.read_text()

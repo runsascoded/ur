@@ -1,6 +1,7 @@
 
 import git
 from pathlib import Path
+from urlpath import URL
 
 class Node:
     def __new__(cls, *args, **kwargs):
@@ -16,6 +17,7 @@ class PathNode(Node):
         if isinstance(path, Node): return
         self.path = Path(path)
         self.name = self.path.name
+        self.url = str(path)
 
     @property
     def is_file(self): return self.path.is_file()
@@ -36,12 +38,22 @@ class PathNode(Node):
 
 
 class GitNode(Node):
-    def __init__(self, obj):
+    def __init__(self, obj, url=None):
         if isinstance(obj, Node): return
-        from git import Blob, Commit, Tree
-        if isinstance(obj, Commit):
-            obj = obj.tree
+        #import git
+        from git import Blob, Tree
+        import _github, _gist
+        if isinstance(obj, (_github.Commit, _gist.Commit)):
+            tree = obj.commit.tree
+            #print(f'obj: {obj} -> {tree}')
+            self.url = URL(obj.www_url)
+            obj = tree
+        elif not url:
+            raise ValueError(f'No URL passed')
+        else:
+            self.url = url
 
+        #print(f'obj: {obj} ({type(obj)})')
         self.obj = obj
         self.is_file = isinstance(obj, Blob)
         self.is_dir = isinstance(obj, Tree)
@@ -52,10 +64,13 @@ class GitNode(Node):
         if self.is_file: return None
         blobs = self.obj.blobs
         trees = self.obj.trees
-        return { obj.name: obj for obj in (blobs + trees) }
+        return {
+            obj.name: GitNode(obj, self.url / obj.name)
+            for obj in (blobs + trees)
+        }
 
     def read(self):
         assert self.is_file
         return self.obj.data_stream.read()
 
-    def __str__(self): return f'Node({self.obj})'
+    def __str__(self): return f'Node({self.url})'

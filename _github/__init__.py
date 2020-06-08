@@ -24,38 +24,38 @@ commit_re = maybe(f'/tree/{commit_id_re}')
 path_re = f'(?P<path>/{file_chars})'
 
 
-class Path:
-    def __init__(self, commit, tree, blob, path):
-        self.commit = commit
-        self.github = commit.github
-        path = pathlib.Path(path)
-        self.name = path.name
-        self.path = path
-        self.tree = tree
-        self.blob = blob
+# class Path:
+#     def __init__(self, commit, tree, blob, path):
+#         self.commit = commit
+#         self.github = commit.github
+#         path = pathlib.Path(path)
+#         self.name = path.name
+#         self.path = path
+#         self.tree = tree
+#         self.blob = blob
 
-    def __str__(self): return self.name
+#     def __str__(self): return self.name
 
-    def __repr__(self): return self.name
+#     def __repr__(self): return self.name
 
-    @property
-    def module_name(self): return self.name.rsplit('.', 1)[0]
+#     @property
+#     def module_name(self): return self.name.rsplit('.', 1)[0]
 
-    @property
-    def module_fullname(self): return f'{self.github.module_name}.{self.module_name}'
+#     @property
+#     def module_fullname(self): return f'{self.github.module_name}.{self.module_name}'
 
-    @property
-    def url(self):
-      gh = self.github
-      return f'https://raw.githubusercontent.com/{gh.org}/{gh.repo}/{self.commit.id}/{self.path}'
+#     @property
+#     def url(self):
+#       gh = self.github
+#       return f'https://raw.githubusercontent.com/{gh.org}/{gh.repo}/{self.commit.id}/{self.path}'
 
-    @property
-    def www_url(self): return f'{self.commit.www_url}/{self.path}'
+#     @property
+#     def www_url(self): return f'{self.commit.www_url}/{self.path}'
 
-    @property
-    def data_stream(self): return self.blob.data_stream
+#     @property
+#     def data_stream(self): return self.blob.data_stream
 
-    def read_text(self): return self.data_stream.read().decode()
+#     def read_text(self): return self.data_stream.read().decode()
 
 
 class Commit(metaclass=Meta):
@@ -63,7 +63,7 @@ class Commit(metaclass=Meta):
         self.github = github
 
     @property
-    def www_url(self): return f'https://github.com/{self.org}/{self.repo}/tree/{self.id}'
+    def www_url(self): return f'{self.github.www_url}/tree/{self.id}'
 
     @property
     def author(self): return self.commit.author.email
@@ -80,12 +80,12 @@ class Commit(metaclass=Meta):
     @property
     def trees(self): return self.tree.trees
 
-    @property
-    def files(self):
-        return [
-            Path(self, self.gist.clone_dir / blob.name)
-            for blob in self.blobs
-        ]
+    # @property
+    # def files(self):
+    #     return [
+    #         Path(self, self.gist.clone_dir / blob.name)
+    #         for blob in self.blobs
+    #     ]
 
     @property
     def files_dict(self): return { file.name: file for file in self.files }

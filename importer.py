@@ -9,9 +9,11 @@ import nbformat
 from os import environ as env
 from pathlib import Path
 from re import match
+from requests import head as HEAD
 import sys
 from sys import stderr
 from types import ModuleType
+from urllib.parse import quote_plus
 
 from cells import CellDeleter
 from nb import read_nb
@@ -136,6 +138,51 @@ class Importer:
 
         return self.node_spec(fullname, node, mod_path)
 
+    def load_gitlab_spec(self, fullname, top, mod_path):
+        self.print(f'load_gitlab_spec: fullname={fullname}')
+        if not mod_path:
+            self.print(f'Creating top-level "{top}" package')
+            return self.spec(fullname, None)
+
+        from sys import modules
+        mod = modules[top]
+        groups = []
+        project = None
+        while mod_path:
+            [ group, *mod_path ] = mod_path
+            if group.startswith('_'): org = org[1:]
+            groups.append(group)
+            groups_str = quote_plus('/'.join(groups))
+            url = f'https://gitlab.com/api/v4/groups/{groups_str}'
+            resp = HEAD(url)
+            if not resp.ok:
+                url = f'https://gitlab.com/api/v4/projects/{groups_str}'
+                resp = HEAD(url)
+                if not resp.ok:
+                    raise ValueError(f"Request failed for {groups_str} ({groups}) as group and project")
+
+                project = groups[-1]
+                groups = groups[:-1]
+                break
+
+        if not project:
+            assert not mod_path
+            self.print(f'Creating GitLab group "{top}.{".".join(groups)}" package')
+            return self.spec(fullname, None)
+
+        id = '/'.join(groups + [project])
+        from _gitlab import Gitlab
+        self.print(f'GitLab repo {id}: skip_cache={opts.skip_cache}')
+        gitlab = Gitlab(id, _skip_cache=opts.skip_cache)
+        commit = gitlab.commit
+        node = GitNode(commit)
+
+        if not mod_path:
+            self.print(f'Building module/pkg for gitlab repo {id}, mod_path {mod_path})')
+            return self.spec(fullname, node, origin=commit.www_url)
+
+        return self.node_spec(fullname, node, mod_path)
+
     def spec(self, fullname, node, origin=None, pkg=True):
         spec = ModuleSpec(fullname, self, origin=origin, is_package=pkg)
         spec._node = node
@@ -180,8 +227,6 @@ class Importer:
     def find_spec(self, fullname, path=None, target=None, mod_path=None):
         self.print(f'Importer.find_spec: fullname={fullname} path={path} target={target} mod_path={mod_path}')
         assert not target
-        # if path and not isinstance(path, Node):
-        #     raise AssertionError(f'path not a Node: {path}')
 
         mod_path = mod_path or fullname.split('.')
         top = mod_path[0]
@@ -189,6 +234,8 @@ class Importer:
             return self.load_gist_spec(fullname, top, mod_path[1:])
         elif top in opts.github_pkgs:
             return self.load_github_spec(fullname, top, mod_path[1:])
+        elif top in opts.gitlab_pkgs:
+            return self.load_gitlab_spec(fullname, top, mod_path[1:])
         else:
             if path:
                 self.print(f'find_spec received path: {path}')

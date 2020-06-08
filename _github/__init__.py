@@ -24,40 +24,6 @@ commit_re = maybe(f'/tree/{commit_id_re}')
 path_re = f'(?P<path>/{file_chars})'
 
 
-# class Path:
-#     def __init__(self, commit, tree, blob, path):
-#         self.commit = commit
-#         self.github = commit.github
-#         path = pathlib.Path(path)
-#         self.name = path.name
-#         self.path = path
-#         self.tree = tree
-#         self.blob = blob
-
-#     def __str__(self): return self.name
-
-#     def __repr__(self): return self.name
-
-#     @property
-#     def module_name(self): return self.name.rsplit('.', 1)[0]
-
-#     @property
-#     def module_fullname(self): return f'{self.github.module_name}.{self.module_name}'
-
-#     @property
-#     def url(self):
-#       gh = self.github
-#       return f'https://raw.githubusercontent.com/{gh.org}/{gh.repo}/{self.commit.id}/{self.path}'
-
-#     @property
-#     def www_url(self): return f'{self.commit.www_url}/{self.path}'
-
-#     @property
-#     def data_stream(self): return self.blob.data_stream
-
-#     def read_text(self): return self.data_stream.read().decode()
-
-
 class Commit(metaclass=Meta):
     def __init__(self, github):
         self.github = github
@@ -80,13 +46,6 @@ class Commit(metaclass=Meta):
     @property
     def trees(self): return self.tree.trees
 
-    # @property
-    # def files(self):
-    #     return [
-    #         Path(self, self.gist.clone_dir / blob.name)
-    #         for blob in self.blobs
-    #     ]
-
     @property
     def files_dict(self): return { file.name: file for file in self.files }
 
@@ -107,7 +66,6 @@ class Github(metaclass=Meta):
       WWW_URL_PATH_BLOB_REGEX,
       RAW_URL_PATH_BLOB_REGEX,
     ]
-    #ID_LEN = 40
 
     def __init__(self):
         [ self.org, self.repo ] = self.id.split('/')
@@ -133,7 +91,7 @@ class Github(metaclass=Meta):
         elif domain == 'raw.githubusercontent.com':
             raw = True
         elif throw:
-            raise Exception(f'Unrecognized Gist URL domain: {domain} ({url})')
+            raise Exception(f'Unrecognized GitHub URL domain: {domain} ({url})')
         else:
             return None
 
@@ -154,11 +112,7 @@ class Github(metaclass=Meta):
         else:
             raise Exception(f'Unrecognized "raw" value: {raw}')
 
-        m = one(regexs, path, throw=throw)
-        if not m: return None
-
-        if fragment: m['fragment'] = fragment
-        return m
+        return one(regexs, path, throw=throw)
 
     @classmethod
     def from_url_path(cls, path, throw=True):

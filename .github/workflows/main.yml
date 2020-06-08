@@ -12,6 +12,11 @@ jobs:
       with:
         ref: ${{ github.head_ref }}
 
+    - name: pwd
+      run: pwd
+    - name: install ur
+      run: pip install -e .
+
     - name: nbconvert README
       uses: runsascoded/nbconvert@master
       with:

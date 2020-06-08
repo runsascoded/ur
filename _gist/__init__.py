@@ -242,7 +242,7 @@ class Gist(metaclass=Meta):
             name = commit.fragments[fragment]
             file = commit.files_dict[name]
         else:
-            if m.get('raw'):
+            if raw:
                 files = commit.files
                 if len(files) != 1:
                     raise Exception(
@@ -259,7 +259,7 @@ class Gist(metaclass=Meta):
             return commit
 
     @property
-    def git_url(self): return f'https://gist.github.com/{self.id}'
+    def git_url(self): return f'https://gist.github.com/{self.id}.git'
 
     @property
     def www_url(self): return f'https://gist.github.com/{self.id}'

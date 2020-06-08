@@ -205,7 +205,7 @@ class Importer:
                 if node_spec:
                     return node_spec
 
-    def create_module(self, spec):
+    def create_module(self, spec, install=True):
         """Create a built-in module"""
         self.print(f'create_module {spec}')
         mod = ModuleType(spec.name)
@@ -214,8 +214,10 @@ class Importer:
         mod.__dict__['get_ipython'] = get_ipython
         mod.__spec__ = spec
 
-        self.print(f'Installing module {spec.name}: {mod}')
-        sys.modules[spec.name] = mod
+        if install:
+            self.print(f'Installing module {spec.name}: {mod}')
+            sys.modules[spec.name] = mod
+
         return mod
 
     def exec_module(self, mod, root_path=None):

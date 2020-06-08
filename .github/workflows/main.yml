@@ -15,7 +15,7 @@ jobs:
     - name: nbconvert README
       uses: runsascoded/nbconvert@master
       with:
-        args: -x -f -d pandas,urlpath,GitPython
+        args: -x -f -d .
 
     - name: Build Docker container for testing
       run: docker build -f Dockerfile.test -t ur-test .

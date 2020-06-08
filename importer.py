@@ -263,7 +263,8 @@ class Importer:
                 self.exec(name, mod, children['__init__.py'], root_path=root_path)
 
             if '__all__' in mod.__dict__:
-                children = { k: children[k] for k in mod.__dict__['__all__'] }
+                all = mod.__dict__['__all__']
+                children = { k: children[k] for k in children if self.mod_basename(k) in all }
                 print(f'{mod}: restricting children based on __all__: {list(children.keys())}')
 
             file_mods = []
@@ -277,7 +278,7 @@ class Importer:
                     self.print(f'Found spec for child module {name} ({mod_name})')
                     file_mod = self.create_module(file_spec)
                     file_mods.append(file_mod)
-                    dct[name] = file_mod
+                    dct[mod_basename] = file_mod
                 else:
                     raise ValueError(f'Failed to find spec for {name} ({child})')
 

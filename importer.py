@@ -1,16 +1,23 @@
 import ast
+from collections.abc import Iterable
+from contextlib import contextmanager, nullcontext
 from importlib._bootstrap import spec_from_loader
+from importlib.machinery import ModuleSpec
 from IPython.core.interactiveshell import InteractiveShell
 from IPython import get_ipython
 import nbformat
 from os import environ as env
 from pathlib import Path
 from re import match
+from requests import head as HEAD
 import sys
 from sys import stderr
 from types import ModuleType
+from urllib.parse import quote_plus
 
 from cells import CellDeleter
+from nb import read_nb
+from node import Node, GitNode, PathNode
 import opts
 
 
@@ -23,45 +30,21 @@ class Importer:
     def __init__(self, **kw):
         self.shell = InteractiveShell.instance()
         self._print = print
+        self.path = []
 
     def print(self, *args, **kwargs):
         if opts.verbose:
             self._print(*args, **kwargs)
 
-    def exec_path(self, path, mod=None):
-        import _gist
-
-        # load the notebook
-        nb_version = nbformat.version_info[0]
-        if isinstance(path, Path):
-            with path.open('r', encoding=opts.encoding) as f:
-                nb = nbformat.read(f, nb_version)
-        elif isinstance(path, str):
-            with open(path, 'r', encoding=opts.encoding) as f:
-                nb = nbformat.read(f, nb_version)
-        elif isinstance(path, _gist.File):
-            nb = nbformat.read(path.data_stream, nb_version)
-        else:
-            raise ValueError(f'Unrecognized file type: {path} ({type(path)})')
+    def exec_path(self, node, mod):
+        nb = read_nb(node)
 
         # Only do something if it's a python notebook
         if nb.metadata.kernelspec.language != 'python':
             self.print("Ignoring '%s': not a python notebook." % file)
             return
 
-        if mod is None:
-            # create the module and add it to sys.modules
-            mod = ModuleType(str(path))
-            mod.__file__ = str(path)
-            mod.__loader__ = self
-            mod.__dict__['get_ipython'] = get_ipython
-
-            sys.modules[path] = mod
-            dct = mod.__dict__
-
-            self.exec_nb(nb, mod)
-        else:
-            self.exec_nb(nb, mod)
+        self.exec_nb(nb, mod)
 
         return mod
 
@@ -99,77 +82,177 @@ class Importer:
                 mod.__nbinit__()
                 mod.__nbinit_done__ = True
 
+    def load_gist_spec(self, fullname, top, mod_path):
+        if not mod_path:
+            # TODO: dedupe multiple top-level aliases
+            self.print(f'Creating top-level "{top}" package')
+            return self.spec(fullname, node=None)
 
-    def find_spec(self, fullname, path=None, target=None, commit=None):
-        self.print(f'find_spec: {fullname} {path} {target} (commit? {commit})')
-
-        path = fullname.split('.')
-        if path[0] not in [ 'gists', 'gist' ]: return
-
-        if len(path) == 1:
-            self.print(f'Creating _gist package')
-            spec = spec_from_loader(fullname, self, origin=None, is_package=True)
-            spec.__license__ = "CC BY-SA 3.0"
-            spec._commit = commit
-            spec._file = None
-
-            spec.submodule_search_locations = []
-
-            return spec
-
-        id = path[1]
+        [ id, *mod_path ] = mod_path
         if id.startswith('_'):
             id = id[1:]
 
-        path = path[2:]
-        if len(path) > 1:
-            raise Exception(f'Too many path components for gist {id}: {path}')
+        from _gist import Gist
 
-        from _gist import Commit, Gist
+        self.print(f'Gist {id}: skip_cache={opts.skip_cache}')
+        gist = Gist(id, _skip_cache=opts.skip_cache)
+        commit = gist.commit
+        node = GitNode(commit)
+        url = gist.www_url
 
-        if isinstance(commit, Commit):
-            gist = commit.gist
-            url = commit.url
-        else:
-            self.print(f'Gist {id}: skip_cache={opts.skip_cache}')
-            gist = Gist(id, _skip_cache=opts.skip_cache)
-            url = gist.url
-            if isinstance(commit, str):
-                commit = Commit(commit, gist)
-            elif commit is None:
-                commit = gist.commit
-            else:
-                raise Exception(f'Invalid Gist commit value: {commit} (gist {gist})')
+        if not mod_path:
+            self.print(f'Building spec for gist {id}')
+            return self.spec(fullname, node, origin=commit.www_url)
 
-        self.print(f'Building module/pkg for gist {commit} ({path}; {target})')
+        return self.node_spec(fullname, node, path)
 
-        if path:
-            [ filename ] = path
-            files = commit.file_bases_dict
-            if filename not in files:
-                raise Exception(f'File {filename} not found in gist {commit} (files: {commit.files})')
-            file = files[filename]
-            url = file.url
-            is_package = False
-        else:
-            file = None
-            is_package = True
+    def load_github_spec(self, fullname, top, mod_path):
+        self.print(f'load_github_spec: fullname={fullname}')
+        if not mod_path:
+            self.print(f'Creating top-level "{top}" package')
+            return self.spec(fullname, None)
 
-        origin = url
+        [ org, *mod_path ] = mod_path
+        if org.startswith('_'): org = org[1:]
+        org = org.replace('_','-')
 
-        self.print(f'Creating package spec from {url} ({origin})')
-        spec = spec_from_loader(fullname, self, origin=origin, is_package=is_package)
-        spec.__license__ = "CC BY-SA 3.0"
-        spec.__author__ = commit.author
-        spec._commit = commit
-        spec._file = file
+        if not mod_path:
+            self.print(f'Creating GitHub org/user "{top}.{org}" package')
+            return self.spec(fullname, None)
 
-        if is_package:
-            spec.submodule_search_locations = [ str(gist.clone_dir) ]
+        [ repo, *mod_path ] = mod_path
+        if repo.startswith('_'): repo = repo[1:]
+        repo = repo.replace('_','-')
 
+        from _github import Github
+
+        id = f'{org}/{repo}'
+        self.print(f'GitHub repo {id}: skip_cache={opts.skip_cache}')
+        github = Github(id, _skip_cache=opts.skip_cache)
+        commit = github.commit
+        node = GitNode(commit)
+
+        if not mod_path:
+            self.print(f'Building module/pkg for github repo {id}, mod_path {mod_path})')
+            return self.spec(fullname, node, origin=commit.www_url)
+
+        return self.node_spec(fullname, node, mod_path)
+
+    def load_gitlab_spec(self, fullname, top, mod_path):
+        self.print(f'load_gitlab_spec: fullname={fullname}')
+        if not mod_path:
+            self.print(f'Creating top-level "{top}" package')
+            return self.spec(fullname, None)
+
+        from sys import modules
+        mod = modules[top]
+        groups = []
+        project = None
+        while mod_path:
+            [ group, *mod_path ] = mod_path
+            if group.startswith('_'): org = org[1:]
+            groups.append(group)
+            groups_str = quote_plus('/'.join(groups))
+            url = f'https://gitlab.com/api/v4/groups/{groups_str}'
+            resp = HEAD(url)
+            if not resp.ok:
+                url = f'https://gitlab.com/api/v4/projects/{groups_str}'
+                resp = HEAD(url)
+                if not resp.ok:
+                    raise ValueError(f"Request failed for {groups_str} ({groups}) as group and project")
+
+                project = groups[-1]
+                groups = groups[:-1]
+                break
+
+        if not project:
+            assert not mod_path
+            self.print(f'Creating GitLab group "{top}.{".".join(groups)}" package')
+            return self.spec(fullname, None)
+
+        id = '/'.join(groups + [project])
+        from _gitlab import Gitlab
+        self.print(f'GitLab repo {id}: skip_cache={opts.skip_cache}')
+        gitlab = Gitlab(id, _skip_cache=opts.skip_cache)
+        commit = gitlab.commit
+        node = GitNode(commit)
+
+        if not mod_path:
+            self.print(f'Building module/pkg for gitlab repo {id}, mod_path {mod_path})')
+            return self.spec(fullname, node, origin=commit.www_url)
+
+        return self.node_spec(fullname, node, mod_path)
+
+    def spec(self, fullname, node, origin=None, pkg=True):
+        spec = ModuleSpec(fullname, self, origin=origin, is_package=pkg)
+        spec._node = node
+        if pkg: spec.submodule_search_locations = []
         return spec
 
-    def create_module(self, spec):
+    def node_spec(self, fullname, node, mod_path, throw=True):
+        self.print(f'node_spec: node={node}, mod_path={mod_path}')
+        full_path = mod_path
+        while mod_path:
+            [ name, *mod_path ] = mod_path
+            nodes = node.children
+            if name in nodes:
+                node = nodes[name]
+            elif not mod_path:
+                    nb_path = name + '.ipynb'
+                    if nb_path in nodes:
+                        node = nodes[nb_path]
+                    else:
+                        py_path = name + '.py'
+                        if py_path in nodes:
+                            node = nodes[py_path]
+                        elif throw:
+                            raise ImportError(f'{fullname}: {name} not found in {list(nodes.keys())}')
+                        else:
+                            return None
+            elif throw:
+                raise ImportError(f'{full_path}: {name} not found in {node}: {list(nodes.keys())}')
+            else:
+                return None
+
+        if isinstance(node, GitNode):
+            origin = str(node.url)
+        elif isinstance(node, PathNode):
+            origin = str(node.path)
+        else:
+            raise ValueError(node)
+
+        self.print(f'Creating package spec {fullname} from {node} (origin={origin})')
+        return self.spec(fullname, node, origin=origin, pkg=node.is_dir)
+
+    def find_spec(self, fullname, path=None, target=None, mod_path=None):
+        self.print(f'Importer.find_spec: fullname={fullname} path={path} target={target} mod_path={mod_path}')
+        assert not target
+
+        mod_path = mod_path or fullname.split('.')
+        top = mod_path[0]
+        if top in opts.gist_pkgs:
+            return self.load_gist_spec(fullname, top, mod_path[1:])
+        elif top in opts.github_pkgs:
+            return self.load_github_spec(fullname, top, mod_path[1:])
+        elif top in opts.gitlab_pkgs:
+            return self.load_gitlab_spec(fullname, top, mod_path[1:])
+        else:
+            if path:
+                self.print(f'find_spec received path: {path}')
+                path = [ PathNode(p) for p in path ]
+            elif self.path:
+                self.print(f'find_spec using self.path: {self.path}')
+                path = self.path
+            else:
+                self.print(f'find_spec using cwd')
+                path = [ PathNode(Path.cwd()) ]
+
+            for node in path:
+                node_spec = self.node_spec(fullname, node, mod_path, throw=False)
+                if node_spec:
+                    return node_spec
+
+    def create_module(self, spec, install=True):
         """Create a built-in module"""
         self.print(f'create_module {spec}')
         mod = ModuleType(spec.name)
@@ -178,68 +261,96 @@ class Importer:
         mod.__dict__['get_ipython'] = get_ipython
         mod.__spec__ = spec
 
-        self.print(f'Installing module {spec.name}: {mod}')
-        sys.modules[spec.name] = mod
+        if install:
+            self.print(f'Installing module {spec.name}: {mod}')
+            sys.modules[spec.name] = mod
+
         return mod
 
-    def exec_module(self, mod=None):
+    def exec_module(self, mod, root_path=None):
         """Exec a module"""
         self.print(f'exec_module {mod}')
         spec = mod.__spec__
+        node = spec._node
         self.exec(
             name=spec.name,
-            commit=spec._commit,
             mod=mod,
-            file=spec._file,
+            node=node,
+            root_path=root_path,
         )
 
-    def exec(self, name, commit, mod, file=None):
+    @contextmanager
+    def tmp_path(self, path):
+        try:
+            prev_path = self.path.copy()
+            if not isinstance(path, Iterable): path = [path]
+            self.path = path + self.path
+            yield
+        finally:
+            if self.path[:len(path)] != path:
+                raise AssertionError(f'Prepended {path} to {prev_path}, but finally found {self.path}')
+            self.path = self.path[1:]
+
+    @staticmethod
+    def mod_basename(name):
+        basename = name.rsplit('.', 1)[0]
+        if name.endswith('.ipynb'):
+            return basename.replace(r'[ -]','_')
+        if name.endswith('.py'):
+            return basename
+
+    def exec(self, name, mod, node, root_path=None):
+        self.print(f'exec: name={name} mod={mod} node={node} root_path={root_path}')
         dct = mod.__dict__
-        if not file:
-            if commit:
-                file_mods = []
-                for file in commit.files:
-                    module_name = file.module_name
-                    fullname = f'{name}.{module_name}'
-                    file_spec = self.find_spec(fullname, commit=commit.id)
-                    if file_spec:
-                        self.print(f'Found spec for child module {module_name} ({fullname})')
-                        file_mod = self.create_module(file_spec)
-                        file_mods.append(file_mod)
-                        dct[module_name] = file_mod
+        if not node: return
+        if node.is_dir:
+            if not root_path: root_path = [node]
+            mod_name = name
+            children = node.children
+            if '__init__.py' in children:
+                self.print(f'{mod}: executing __init__.py')
+                self.exec(name, mod, children['__init__.py'], root_path=root_path)
 
-                # Temporarily add a local notebook loader rooted at the Gist's root, so that local imports within the Gist resolve
-                from local_importer import NotebookFinder
-                clone_dir = str(commit.gist.clone_dir)
-                finder = NotebookFinder(clone_dir)
-                prev_meta_path = sys.meta_path.copy()
-                prev_path = sys.path.copy()
-                try:
-                    sys.path = [clone_dir] + sys.path
-                    sys.meta_path += [ finder ]
-                    [ self.exec_module(file_mod) for file_mod in file_mods ]
-                finally:
-                    # Remove this Gist's custom loader, verifying that meta_path looks the way we expect
-                    [ pos ] = [ idx for idx, loader in enumerate(sys.meta_path) if loader is finder ]
-                    if len(prev_meta_path) + 1 != len(sys.meta_path) or \
-                        pos != len(prev_meta_path):
-                        stderr.write(f'Unexpected sys.meta_path change while executing module {file_mod}: {len(prev_meta_path)} → {len(sys.meta_path)} entries, new loader at position {pos}\n')
-                    sys.meta_path.pop(pos)
+            if '__all__' in mod.__dict__:
+                all = mod.__dict__['__all__']
+                children = { k: children[k] for k in children if self.mod_basename(k) in all }
+                print(f'{mod}: restricting children based on __all__: {list(children.keys())}')
 
-                    [ pos ] = [ idx for idx, path in enumerate(sys.path) if path == clone_dir ]
-                    if len(prev_path) + 1 != len(sys.path) or \
-                        pos != 0:
-                        stderr.write(f'Unexpected sys.path change while executing module {file_mod}: {len(prev_path)} → {len(sys.path)} entries, new entry at position {pos}\n')
-                    sys.path.pop(pos)
+            file_mods = []
+            for name, child in children.items():
+                mod_basename = self.mod_basename(name)
+                if not mod_basename: continue
+                fullname = f'{mod_name}.{mod_basename}'
+                mod_path = [mod_basename]
+                file_spec = self.find_spec(fullname, path=root_path, mod_path=mod_path)
+                if file_spec:
+                    self.print(f'Found spec for child module {name} ({mod_name})')
+                    file_mod = self.create_module(file_spec)
+                    file_mods.append(file_mod)
+                    dct[mod_basename] = file_mod
+                else:
+                    raise ValueError(f'Failed to find spec for {name} ({child})')
+
+            [
+                self.exec_module(file_mod, root_path)
+                for file_mod in file_mods
+            ]
         else:
-            self.print(f'Attempt to exec module {name}')
-            if file.name.endswith('.py'):
-                self.print(f'exec py: {file}')
-                code = file.read_text()
-                try:
-                    exec(code, dct)
-                except:
-                    self.print(f'Error executing module {name} ({file}\n{code}')
-            elif file.name.endswith('.ipynb'):
-                self.print(f'exec notebook: {file}')
-                self.exec_path(file, mod)
+            self.print(f'Attempt to exec module {name} (root_path={root_path})')
+            #assert root_path
+            if root_path:
+                ctx = self.tmp_path(root_path)
+            else:
+                ctx = nullcontext()
+            with ctx:
+                if node.name.endswith('.py'):
+                    self.print(f'exec .py file: {node}')
+                    code = node.read_text()
+                    try:
+                        exec(code, dct)
+                    except Exception as e:
+                        stderr.write(f'Error executing module {name} ({node}):\n{code}\n')
+                        raise e
+                elif node.name.endswith('.ipynb'):
+                    self.print(f'exec .ipynb file: {node}')
+                    self.exec_path(node, mod)

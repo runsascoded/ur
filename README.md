@@ -1,8 +1,6 @@
 # ur
 
-> *ur- (combining form): primitive, original, or earliest*
- 
-*Universal Resources*: import remote Python files and Jupyter notebooks, from GitHub Gists, the local filesystem, or arbitrary URLs.
+Import remote Python files and Jupyter notebooks, from GitHub Gists, the local filesystem, or arbitrary URLs:
 
 <table>
   <tr>
@@ -38,8 +36,8 @@
     <td align="right">✅</td>
     <td align="right">✅</td>
     <td align="right">✅</td>
-    <td align="right">🚧</td>
-    <td align="right">🚧</td>
+    <td align="right">✅</td>
+    <td align="right">✅</td>
   </tr>
   <tr>
     <td align="right">
@@ -48,8 +46,8 @@
     <td align="right">✅</td>
     <td align="right">✅</td>
     <td align="right">✅</td>
-    <td align="right">🚧</td>
-    <td align="right">🚧</td>
+    <td align="right">✅</td>
+    <td align="right">✅</td>
   </tr>
 </table>
 
@@ -58,6 +56,7 @@
 - [**Install**](#install)
 - [**Usage**](#usage)
   - [Import GitHub Gists](#gists)
+  - [Import from GitHub Repos](#github)
   - [Import arbitrary URLs](#urls)
   - [Configuration: `ur.opts`](#configs)
 - [**Discussion**](#discussion)
@@ -71,20 +70,21 @@
     - [Project Management](#Project-Management)
 
 ## Install: <a id="install"></a>
+In a shell:
 ```bash
 pip install ur
 ```
-Or, in a Jupyter notebook:
-
-
+In a Jupyter notebook:
 ```python
 from sys import executable as python
-!{python} -m pip install -q ur
+!{python} -m pip install ur 
 ```
 
 ## Usage <a id="usage"></a>
 
 ### Import GitHub Gists <a id="gists"></a>
+
+Import several notebooks and Python files from [a Gist](https://gist.github.com/1288bff2f9e05394a94312010da267bb):
 
 
 ```python
@@ -92,7 +92,7 @@ from gist._1288bff2f9e05394a94312010da267bb import *
 a_b.a(), a_b.b(), c.c()
 ```
 
-    Cloning https://gist.github.com/1288bff2f9e05394a94312010da267bb into .objs/Gist/1288bff2f9e05394a94312010da267bb/clone
+    Cloning https://gist.github.com/1288bff2f9e05394a94312010da267bb.git into .objs/Gist/1288bff2f9e05394a94312010da267bb/clone
 
 
 
@@ -102,7 +102,42 @@ a_b.a(), a_b.b(), c.c()
 
 
 
-That imports 2 Jupyter notebooks from https://gist.github.com/1288bff2f9e05394a94312010da267bb (note the leading underscore in the `import` statement, which is necessary when the Gist ID begins with a number), and calls functions defined in them.
+(note the leading underscore in the `import` statement, which is necessary when the Gist ID begins with a number)
+
+### Import from GitHub, GitLab Repos <a id="github"></a>
+Import some helper functions (in this case, various wrappers around [`subprocess`](https://docs.python.org/3/library/subprocess.html) functions) directly from [a notebook on GitHub](https://github.com/ryan-williams/jupyter-rc/blob/master/process.ipynb):
+
+
+```python
+from github.ryan_williams.jupyter_rc.process import *
+lines('echo','yay')  # wrapper around subprocess.check_output that asserts and returns a single line written to stdout
+```
+
+    Cloning https://github.com/ryan-williams/jupyter-rc.git into .objs/Github/ryan-williams/jupyter-rc/clone
+    Running: ['echo', 'yay']
+
+
+
+
+
+    ['yay']
+
+
+
+Importing from GitLab also works:
+
+
+```python
+from gitlab.runsascoded.dotfiles.jupyter.cd import cd
+from pathlib import Path
+with cd('examples'): print(Path.cwd())
+```
+
+    Cloning https://gitlab.com/runsascoded/dotfiles/jupyter.git into .objs/Gitlab/runsascoded/dotfiles/jupyter/clone
+    /github/workspace/examples
+
+
+([gitlab.com notebook](https://gitlab.com/runsascoded/dotfiles/jupyter/-/blob/master/cd.ipynb))
 
 ### Import arbitrary URLs <a id="urls"></a>
 The `ur` module exposes a powerful API for importing code from {local,remote} {`.py`,`.ipynb`} files.
@@ -258,7 +293,7 @@ from gist.abcdef0123456789abcdef0123456789 import *
 - [ ] test/handle pip dependencies in gist imports
 - [ ] API for tagging/skipping cells in notebooks (visualizations, tests, etc.)
 - [ ] work with `importlib.reload`
-- [ ] support `__init__.ipynb` (automatically load notebook when loading Gist), `__all__` (configure `import *` behavior)
+- [x] support `__init__.ipynb` (automatically load notebook when loading Gist), `__all__` (configure `import *` behavior)
 - [ ] more nuanced TTL / `skip_cache` behavior (e.g. let cached URLs time-out appropriately based on HTTP headers, a la [`requests-cache`](https://pypi.org/project/requests-cache/))
 
 #### Usability
@@ -268,8 +303,14 @@ from gist.abcdef0123456789abcdef0123456789 import *
   - [ ] colorized / rich log rendering (incl. HTML in notebook environments)
 
 #### Import Sources
-- [ ] support github / gitlab imports
+- [x] support github / gitlab imports
 - [ ] Support `nbformat`/Jupyter versions >4
+
+Import from specific refs within Gists/repos:
+  - [ ] commit SHAs (e.g. `gist._1288bff2f9e05394a94312010da267bb._8d7c134f5ef7bd340fd52840006d37bdd52515a5`)
+  - [ ] short commit SHAs (e.g. `gist._1288bff2f9e05394a94312010da267bb._8d7c134`)
+  - [ ] branch names (e.g. `gist._1288bff2f9e05394a94312010da267bb.master`)
+  - [ ] tags (e.g. `gist._1288bff2f9e05394a94312010da267bb.v1.0`)
 
 #### Project Management
 - [ ] Minimize(+freeze!) [dependencies](./setup.py)

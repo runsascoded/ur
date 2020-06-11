@@ -1,5 +1,6 @@
 import ast
 import sys
+from importlib.machinery import ModuleSpec
 from inspect import stack
 from pathlib import Path
 from re import match
@@ -11,9 +12,11 @@ from IPython import get_ipython
 from IPython.core.interactiveshell import InteractiveShell
 
 from cells import CellDeleter
+from node import PathNode
 
 # Injects an `Importer`!
 from gists import importer
+
 import opts
 from rgxs import maybe
 
@@ -46,6 +49,14 @@ class URLLoader:
     def print(self, *args, **kwargs):
         if opts.verbose:
             self._print(*args, **kwargs)
+
+    def url_mod(self, url, path):
+        node = PathNode(path)
+        self.print(f'Forwarding URL {url} to path {path}')
+        spec = importer.spec(str(url), node, origin=str(path), pkg=False)
+        mod = importer.create_module(spec, install=False)
+        mod = importer.exec_path(node, mod)
+        return mod
 
     def main(
         self,
@@ -120,12 +131,12 @@ class URLLoader:
             elif match(r'https?', url.scheme):
                 from url import URL
                 url = URL(path)
+                # Force materialization of the URL's content to the on-disk cache
                 url.content
                 path = url._dir / 'content'
-                print(f'Forwarding dir {path} for url {url}')
-                mod = importer.exec_path(path)
+                mod = self.url_mod(url, path)
         else:
-            mod = importer.exec_path(path)
+            mod = self.url_mod(url, path)
 
         if not names and not all: return mod
 

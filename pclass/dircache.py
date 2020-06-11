@@ -42,7 +42,7 @@ class Meta(type):
         def log(*args, **kwargs):
             if debug:
                 writer = debug
-                if debug is True:
+                if debug is True or debug == 1:
                     writer = print
                 writer(*args, **kwargs)
 

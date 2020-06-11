@@ -7,7 +7,5 @@ COPY . ur
 WORKDIR ur
 RUN pip install -e .
 ENV PATH=".:$PATH"
-#ENTRYPOINT [ "local-nested-import-pkgs-wildcard-test.py" ]
-ENTRYPOINT [ "python", "tests.py" ]
-#ENTRYPOINT [ "papermill", "-k", "3.8.2", "runtests.ipynb" ]
-#CMD [ "rantests.ipynb" ]
+ENTRYPOINT [ "papermill", "-k", "3.8.2", "runtests.ipynb" ]
+CMD [ "rantests.ipynb" ]

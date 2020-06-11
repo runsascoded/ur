@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 out = None  # directory to write executed notebooks to
 kernel = '3.8.2'
 

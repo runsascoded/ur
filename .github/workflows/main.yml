@@ -18,7 +18,7 @@ jobs:
         args: -x -f -d .,pandas
 
     - name: Build Docker container for testing
-      run: docker build -f Dockerfile.test -t ur-test .
+      run: docker build -f Dockerfile.test -t runsascoded/ur-test .
 
     - name: Run tests
-      run: docker run -v $PWD:/ur ur-test
+      run: docker run runsascoded/ur-test

@@ -3,7 +3,9 @@ RUN pip install --upgrade pip
 RUN pip install ipykernel papermill nbformat==4.4.0
 RUN pip install pandas  # example module imported in some tests
 RUN python -m ipykernel install --name 3.8.2
+COPY . ur
 WORKDIR ur
+RUN pip install -e .
 ENTRYPOINT [ "python", "tests.py" ]
 #ENTRYPOINT [ "papermill", "-k", "3.8.2", "runtests.ipynb" ]
 #CMD [ "rantests.ipynb" ]

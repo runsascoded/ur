@@ -17,6 +17,8 @@ jobs:
       with:
         args: -x -f -d .,pandas
 
+    - name: install tree
+      run: sudo apt-get install -y tree
     - name: inspect examples dir
       run: tree -pug examples
     # - name: Build Docker container for testing

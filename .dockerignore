@@ -24,6 +24,7 @@
 !importer.py
 !local-nested-import-pkgs-test.ipynb
 !local-nested-import-pkgs-wildcard-test.ipynb
+!local-nested-import-pkgs-wildcard-test.py
 !local-nested-import-test.ipynb
 !make-dockerignore.py
 !mutating-notebook-test

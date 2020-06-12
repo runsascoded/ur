@@ -12,7 +12,7 @@ from IPython import get_ipython
 from IPython.core.interactiveshell import InteractiveShell
 
 from cells import CellDeleter
-from node import PathNode
+from node import GitNode, PathNode
 
 # Injects an `Importer`!
 from gists import importer
@@ -53,7 +53,7 @@ class URLLoader:
     def url_mod(self, url, path):
         node = PathNode(path)
         self.print(f'Forwarding URL {url} to path {path}')
-        spec = importer.spec(str(url), node, origin=str(path), pkg=False)
+        spec = importer.spec(str(url), node, origin=path, pkg=False)
         mod = importer.create_module(spec, install=False)
         mod = importer.exec_path(node, mod)
         return mod
@@ -117,12 +117,23 @@ class URLLoader:
                     log(f'Found loaded gist module: {mod}')
                 else:
                     log(f'Loading gist module {name} (commit {commit})')
-                    spec = importer.find_spec(name, commit=commit)
-                    if not spec:
-                        raise Exception(f'Failed to find spec for {name} (commit {commit})')
+                    node = GitNode(commit)
+                    with importer.tmp_path(node):
+                        [ top, *pieces ] = name.split('.')
+                        mod_path = [top]
+                        fullname = top
+                        while True:
+                            spec = importer.find_spec(name)
+                            if not spec:
+                                raise Exception(f'Failed to find spec for {name} (commit {commit})')
 
-                    mod = importer.create_module(spec)
-                    importer.exec_module(mod)
+                            mod = importer.create_module(spec)
+                            importer.exec_module(mod)
+
+                            if not pieces: break
+                            basename = pieces.pop(0)
+                            mod_path += [basename]
+                            fullname += f'.{basename}'
 
             elif domain == 'github.com':
                 raise NotImplementedError

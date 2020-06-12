@@ -82,7 +82,7 @@ class Importer:
                 mod.__nbinit__()
                 mod.__nbinit_done__ = True
 
-    def load_gist_spec(self, fullname, top, mod_path):
+    def load_gist_spec(self, fullname, top, mod_path, commit=None):
         if not mod_path:
             # TODO: dedupe multiple top-level aliases
             self.print(f'Creating top-level "{top}" package')
@@ -94,17 +94,21 @@ class Importer:
 
         from _gist import Gist
 
-        self.print(f'Gist {id}: skip_cache={opts.skip_cache}')
-        gist = Gist(id, _skip_cache=opts.skip_cache)
-        commit = gist.commit
+        if commit:
+            self.print(f'Gist {id} (specified commit {commit}): skip_cache={opts.skip_cache}')
+        else:
+            gist = Gist(id, _skip_cache=opts.skip_cache)
+            commit = gist.commit
+            self.print(f'Gist {id} (default commit {commit}): skip_cache={opts.skip_cache}')
+
         node = GitNode(commit)
-        url = gist.www_url
+        url = node.url
 
         if not mod_path:
             self.print(f'Building spec for gist {id}')
-            return self.spec(fullname, node, origin=commit.www_url)
+            return self.spec(fullname, node, origin=url)
 
-        return self.node_spec(fullname, node, path)
+        return self.node_spec(fullname, node, mod_path)
 
     def load_github_spec(self, fullname, top, mod_path):
         self.print(f'load_github_spec: fullname={fullname}')
@@ -184,7 +188,7 @@ class Importer:
         return self.node_spec(fullname, node, mod_path)
 
     def spec(self, fullname, node, origin=None, pkg=True):
-        spec = ModuleSpec(fullname, self, origin=origin, is_package=pkg)
+        spec = ModuleSpec(fullname, self, origin=str(origin), is_package=pkg)
         spec._node = node
         if pkg: spec.submodule_search_locations = []
         return spec
@@ -231,7 +235,11 @@ class Importer:
         mod_path = mod_path or fullname.split('.')
         top = mod_path[0]
         if top in opts.gist_pkgs:
-            return self.load_gist_spec(fullname, top, mod_path[1:])
+            if path and len(path) == 1 and isinstance(path[0], GitNode):
+                commit = path[0]
+            else:
+                commit = None
+            return self.load_gist_spec(fullname, top, mod_path[1:], commit=commit)
         elif top in opts.github_pkgs:
             return self.load_github_spec(fullname, top, mod_path[1:])
         elif top in opts.gitlab_pkgs:
@@ -295,11 +303,13 @@ class Importer:
         try:
             prev_path = self.path.copy()
             if not isinstance(path, Iterable): path = [path]
+            self.print(f'Prepending Importer tmp_path: {path}')
             self.path = path + self.path
             yield
         finally:
             if self.path[:len(path)] != path:
                 raise AssertionError(f'Prepended {path} to {prev_path}, but finally found {self.path}')
+            self.print(f'Popping Importer tmp_path: {path[0]}')
             self.path = self.path[1:]
 
     @staticmethod
@@ -351,7 +361,8 @@ class Importer:
                     self.print(f'exec .py file: {node}')
                     code = node.read_text()
                     try:
-                        exec(code, dct)
+                        pyc = compile(code, node.url, 'exec')
+                        exec(pyc, dct)
                     except Exception as e:
                         stderr.write(f'Error executing module {name} ({node}):\n{code[:1000]}\n')
                         raise e

@@ -297,7 +297,10 @@ class Gist(metaclass=Meta):
             check_call([ 'git', 'clone', url, str(path) ])
 
     @property
-    def commit(self): return Commit(self.clone.commit().hexsha, self)
+    def commit(self):
+        clone = self.clone
+        print(f'clone: {clone}')
+        return Commit(clone.commit().hexsha, self)
 
     @property
     def clone_dir(self): return Path(self.clone.git_dir).parent

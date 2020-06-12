@@ -261,7 +261,7 @@ class Importer:
                 if node_spec:
                     return node_spec
 
-            self.print(f'Returning without finding spec: {fullname=} {mod_path=} {path=}')
+            self.print(f'Returning without finding spec: fullname={fullname} mod_path={mod_path} path={path}')
 
     def create_module(self, spec, install=True):
         """Create a built-in module"""
@@ -327,7 +327,6 @@ class Importer:
                 children = { k: children[k] for k in children if self.mod_basename(k) in all }
                 self.print(f'{mod}: restricting children based on __all__: {list(children.keys())}')
 
-            file_mods = []
             for name, child in children.items():
                 mod_basename = self.mod_basename(name)
                 if not mod_basename: continue
@@ -337,15 +336,10 @@ class Importer:
                 if file_spec:
                     self.print(f'Found spec for child module {name} ({mod_name})')
                     file_mod = self.create_module(file_spec)
-                    file_mods.append(file_mod)
                     dct[mod_basename] = file_mod
+                    self.exec_module(file_mod, root_path)
                 else:
                     raise ValueError(f'Failed to find spec for {name} ({child})')
-
-            [
-                self.exec_module(file_mod, root_path)
-                for file_mod in file_mods
-            ]
         else:
             self.print(f'Attempt to exec module {name} (root_path={root_path})')
             if root_path:

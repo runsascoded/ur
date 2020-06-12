@@ -240,17 +240,28 @@ class Importer:
             if path:
                 self.print(f'find_spec received path: {path}')
                 path = [ PathNode(p) for p in path ]
-            elif self.path:
-                self.print(f'find_spec using self.path: {self.path}')
-                path = self.path
             else:
-                self.print(f'find_spec using cwd')
-                path = [ PathNode(Path.cwd()) ]
+                path = []
+
+            if self.path:
+                self.print(f'find_spec adding self.path: {self.path}')
+                path = path + self.path
+
+            path += [ PathNode(Path.cwd()) ]
+
+            try:
+                from git import Repo
+                repo = Repo(search_parent_directories=True)
+                path += [ PathNode(repo.working_dir) ]
+            except Exception as e:
+                stderr.write(f'No repo found from {Path.cwd()}\n')
 
             for node in path:
                 node_spec = self.node_spec(fullname, node, mod_path, throw=False)
                 if node_spec:
                     return node_spec
+
+            self.print(f'Returning without finding spec: {fullname=} {mod_path=} {path=}')
 
     def create_module(self, spec, install=True):
         """Create a built-in module"""
@@ -314,7 +325,7 @@ class Importer:
             if '__all__' in mod.__dict__:
                 all = mod.__dict__['__all__']
                 children = { k: children[k] for k in children if self.mod_basename(k) in all }
-                print(f'{mod}: restricting children based on __all__: {list(children.keys())}')
+                self.print(f'{mod}: restricting children based on __all__: {list(children.keys())}')
 
             file_mods = []
             for name, child in children.items():
@@ -337,7 +348,6 @@ class Importer:
             ]
         else:
             self.print(f'Attempt to exec module {name} (root_path={root_path})')
-            #assert root_path
             if root_path:
                 ctx = self.tmp_path(root_path)
             else:
@@ -349,7 +359,7 @@ class Importer:
                     try:
                         exec(code, dct)
                     except Exception as e:
-                        stderr.write(f'Error executing module {name} ({node}):\n{code}\n')
+                        stderr.write(f'Error executing module {name} ({node}):\n{code[:1000]}\n')
                         raise e
                 elif node.name.endswith('.ipynb'):
                     self.print(f'exec .ipynb file: {node}')

@@ -19,6 +19,7 @@ from cells import CellDeleter
 from nb import read_nb
 from node import Node, GitNode, PathNode
 import opts
+from urignore import UrIgnore
 
 
 class Importer:
@@ -31,6 +32,12 @@ class Importer:
         self.shell = InteractiveShell.instance()
         self._print = print
         self.path = []
+
+        default_urignore = Path.cwd() / '.urignore'
+        if default_urignore.exists():
+            self.urignores = [UrIgnore(PathNode(default_urignore))]
+        else:
+            self.urignores = []
 
     def print(self, *args, **kwargs):
         if opts.verbose:
@@ -312,6 +319,21 @@ class Importer:
             self.print(f'Popping Importer tmp_path: {path[0]}')
             self.path = self.path[1:]
 
+    @contextmanager
+    def urignore(self, node):
+        try:
+            prev_urignores = self.urignores
+            idx = len(prev_urignores)
+            urignore = UrIgnore(node)
+            self.urignores += [urignore]
+            self.print(f'Pushed urignore {idx}: {self.urignores}')
+            yield
+        finally:
+            if self.urignores[idx] != urignore:
+                raise AssertionError(f'Prepended {urignore} to {prev_urignores}, but finally found {self.urignores}')
+            self.print(f'Popping Importer urignores: {self.urignores[idx]}')
+            self.urignores = self.urignores[:idx] + self.urignores[(idx+1):]
+
     @staticmethod
     def mod_basename(name):
         basename = name.rsplit('.', 1)[0]
@@ -328,29 +350,67 @@ class Importer:
             if not root_path: root_path = [node]
             mod_name = name
             children = node.children
-            if '__init__.py' in children:
-                self.print(f'{mod}: executing __init__.py')
-                self.exec(name, mod, children['__init__.py'], root_path=root_path)
 
-            if '__all__' in mod.__dict__:
-                all = mod.__dict__['__all__']
-                children = { k: children[k] for k in children if self.mod_basename(k) in all }
-                self.print(f'{mod}: restricting children based on __all__: {list(children.keys())}')
+            if '.urignore' in children:
+                urignore_ctx = self.urignore(children['.urignore'])
+            else:
+                urignore_ctx = nullcontext()
 
-            for name, child in children.items():
-                mod_basename = self.mod_basename(name)
-                if not mod_basename: continue
-                if mod_basename == '__init__': continue
-                fullname = f'{mod_name}.{mod_basename}'
-                mod_path = [mod_basename]
-                file_spec = self.find_spec(fullname, path=root_path, mod_path=mod_path)
-                if file_spec:
-                    self.print(f'Found spec for child module {name} ({mod_name})')
-                    file_mod = self.create_module(file_spec)
-                    dct[mod_basename] = file_mod
-                    self.exec_module(file_mod, root_path)
-                else:
-                    raise ValueError(f'Failed to find spec for {name} ({child})')
+            with urignore_ctx:
+                if '__init__.py' in children:
+                    self.print(f'{mod}: executing __init__.py')
+                    self.exec(name, mod, children['__init__.py'], root_path=root_path)
+
+                if '__all__' in mod.__dict__:
+                    all = mod.__dict__['__all__']
+                    children = {
+                        k: children[k]
+                        for k in children
+                        if self.mod_basename(k) in all
+                    }
+                    self.print(f'{mod}: restricting children based on __all__: {list(children.keys())}')
+
+                for name, child in children.items():
+                    urignores = [
+                        urignore
+                        for urignore in self.urignores
+                        if not urignore.check(child)
+                    ]
+                    if urignores:
+                        self.print(f'Skipping {child} due to urignores: {urignores}')
+                        continue
+
+                    mod_basename = self.mod_basename(name)
+
+                    if not mod_basename:
+                        if child.is_dir:
+                            mod_basename = child.name
+                        else:
+                            continue
+
+                    skip_basenames = [
+                        '__init__',
+                        '__pycache__',
+                        '.ipynb_checkpoints',
+                        'setup',
+                    ]
+                    if mod_basename in skip_basenames: continue
+
+                    fullname = f'{mod_name}.{mod_basename}'
+                    mod_path = [mod_basename]
+                    file_spec = self.find_spec(fullname, path=root_path, mod_path=mod_path)
+                    if file_spec:
+                        self.print(f'Found spec for child module {name} ({mod_name})')
+                        file_mod = self.create_module(file_spec)
+                        dct[mod_basename] = file_mod
+                        if child.is_dir:
+                            path_ctx = self.tmp_path(child)
+                        else:
+                            path_ctx = nullcontext()
+                        with path_ctx:
+                            self.exec_module(file_mod, root_path)
+                    else:
+                        raise ValueError(f'Failed to find spec for {name} ({child})')
         else:
             self.print(f'Attempt to exec module {name} (root_path={root_path})')
             if root_path:

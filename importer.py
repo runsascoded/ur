@@ -340,6 +340,7 @@ class Importer:
             for name, child in children.items():
                 mod_basename = self.mod_basename(name)
                 if not mod_basename: continue
+                if mod_basename == '__init__': continue
                 fullname = f'{mod_name}.{mod_basename}'
                 mod_path = [mod_basename]
                 file_spec = self.find_spec(fullname, path=root_path, mod_path=mod_path)

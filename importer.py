@@ -82,7 +82,7 @@ class Importer:
                 mod.__nbinit__()
                 mod.__nbinit_done__ = True
 
-    def load_gist_spec(self, fullname, top, mod_path):
+    def load_gist_spec(self, fullname, top, mod_path, commit=None):
         if not mod_path:
             # TODO: dedupe multiple top-level aliases
             self.print(f'Creating top-level "{top}" package')
@@ -94,17 +94,21 @@ class Importer:
 
         from _gist import Gist
 
-        self.print(f'Gist {id}: skip_cache={opts.skip_cache}')
-        gist = Gist(id, _skip_cache=opts.skip_cache)
-        commit = gist.commit
+        if commit:
+            self.print(f'Gist {id} (specified commit {commit}): skip_cache={opts.skip_cache}')
+        else:
+            gist = Gist(id, _skip_cache=opts.skip_cache)
+            commit = gist.commit
+            self.print(f'Gist {id} (default commit {commit}): skip_cache={opts.skip_cache}')
+
         node = GitNode(commit)
-        url = gist.www_url
+        url = node.url
 
         if not mod_path:
             self.print(f'Building spec for gist {id}')
-            return self.spec(fullname, node, origin=commit.www_url)
+            return self.spec(fullname, node, origin=url)
 
-        return self.node_spec(fullname, node, path)
+        return self.node_spec(fullname, node, mod_path)
 
     def load_github_spec(self, fullname, top, mod_path):
         self.print(f'load_github_spec: fullname={fullname}')
@@ -184,7 +188,7 @@ class Importer:
         return self.node_spec(fullname, node, mod_path)
 
     def spec(self, fullname, node, origin=None, pkg=True):
-        spec = ModuleSpec(fullname, self, origin=origin, is_package=pkg)
+        spec = ModuleSpec(fullname, self, origin=str(origin), is_package=pkg)
         spec._node = node
         if pkg: spec.submodule_search_locations = []
         return spec
@@ -231,7 +235,11 @@ class Importer:
         mod_path = mod_path or fullname.split('.')
         top = mod_path[0]
         if top in opts.gist_pkgs:
-            return self.load_gist_spec(fullname, top, mod_path[1:])
+            if path and len(path) == 1 and isinstance(path[0], GitNode):
+                commit = path[0]
+            else:
+                commit = None
+            return self.load_gist_spec(fullname, top, mod_path[1:], commit=commit)
         elif top in opts.github_pkgs:
             return self.load_github_spec(fullname, top, mod_path[1:])
         elif top in opts.gitlab_pkgs:
@@ -240,17 +248,28 @@ class Importer:
             if path:
                 self.print(f'find_spec received path: {path}')
                 path = [ PathNode(p) for p in path ]
-            elif self.path:
-                self.print(f'find_spec using self.path: {self.path}')
-                path = self.path
             else:
-                self.print(f'find_spec using cwd')
-                path = [ PathNode(Path.cwd()) ]
+                path = []
+
+            if self.path:
+                self.print(f'find_spec adding self.path: {self.path}')
+                path = path + self.path
+
+            path += [ PathNode(Path.cwd()) ]
+
+            try:
+                from git import Repo
+                repo = Repo(search_parent_directories=True)
+                path += [ PathNode(repo.working_dir) ]
+            except Exception as e:
+                stderr.write(f'No repo found from {Path.cwd()}\n')
 
             for node in path:
                 node_spec = self.node_spec(fullname, node, mod_path, throw=False)
                 if node_spec:
                     return node_spec
+
+            self.print(f'Returning without finding spec: fullname={fullname} mod_path={mod_path} path={path}')
 
     def create_module(self, spec, install=True):
         """Create a built-in module"""
@@ -284,11 +303,13 @@ class Importer:
         try:
             prev_path = self.path.copy()
             if not isinstance(path, Iterable): path = [path]
+            self.print(f'Prepending Importer tmp_path: {path}')
             self.path = path + self.path
             yield
         finally:
             if self.path[:len(path)] != path:
                 raise AssertionError(f'Prepended {path} to {prev_path}, but finally found {self.path}')
+            self.print(f'Popping Importer tmp_path: {path[0]}')
             self.path = self.path[1:]
 
     @staticmethod
@@ -314,30 +335,24 @@ class Importer:
             if '__all__' in mod.__dict__:
                 all = mod.__dict__['__all__']
                 children = { k: children[k] for k in children if self.mod_basename(k) in all }
-                print(f'{mod}: restricting children based on __all__: {list(children.keys())}')
+                self.print(f'{mod}: restricting children based on __all__: {list(children.keys())}')
 
-            file_mods = []
             for name, child in children.items():
                 mod_basename = self.mod_basename(name)
                 if not mod_basename: continue
+                if mod_basename == '__init__': continue
                 fullname = f'{mod_name}.{mod_basename}'
                 mod_path = [mod_basename]
                 file_spec = self.find_spec(fullname, path=root_path, mod_path=mod_path)
                 if file_spec:
                     self.print(f'Found spec for child module {name} ({mod_name})')
                     file_mod = self.create_module(file_spec)
-                    file_mods.append(file_mod)
                     dct[mod_basename] = file_mod
+                    self.exec_module(file_mod, root_path)
                 else:
                     raise ValueError(f'Failed to find spec for {name} ({child})')
-
-            [
-                self.exec_module(file_mod, root_path)
-                for file_mod in file_mods
-            ]
         else:
             self.print(f'Attempt to exec module {name} (root_path={root_path})')
-            #assert root_path
             if root_path:
                 ctx = self.tmp_path(root_path)
             else:
@@ -347,9 +362,10 @@ class Importer:
                     self.print(f'exec .py file: {node}')
                     code = node.read_text()
                     try:
-                        exec(code, dct)
+                        pyc = compile(code, node.url, 'exec')
+                        exec(pyc, dct)
                     except Exception as e:
-                        stderr.write(f'Error executing module {name} ({node}):\n{code}\n')
+                        stderr.write(f'Error executing module {name} ({node}):\n{code[:1000]}\n')
                         raise e
                 elif node.name.endswith('.ipynb'):
                     self.print(f'exec .ipynb file: {node}')

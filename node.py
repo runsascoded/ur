@@ -26,8 +26,12 @@ class PathNode(Node):
     def is_dir(self): return self.path.is_dir()
 
     @property
+    def exists(self): return self.path.exists()
+
+    @property
     def children(self):
-        return { p.name: PathNode(p) for p in self.path.iterdir() }
+        children = list(self.path.iterdir())
+        return { p.name: PathNode(p) for p in children }
 
     def read(self):
         assert self.is_file
@@ -40,12 +44,10 @@ class PathNode(Node):
 class GitNode(Node):
     def __init__(self, obj, url=None):
         if isinstance(obj, Node): return
-        #import git
         from git import Blob, Tree
         import _github, _gist
         if isinstance(obj, (_github.Commit, _gist.Commit)):
             tree = obj.commit.tree
-            #print(f'obj: {obj} -> {tree}')
             self.url = URL(obj.www_url)
             obj = tree
         elif not url:
@@ -53,7 +55,6 @@ class GitNode(Node):
         else:
             self.url = url
 
-        #print(f'obj: {obj} ({type(obj)})')
         self.obj = obj
         self.is_file = isinstance(obj, Blob)
         self.is_dir = isinstance(obj, Tree)

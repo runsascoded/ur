@@ -40,7 +40,6 @@
 !runtests.py
 !setup.cfg
 !setup.py
-!test.py
 !tests/test_pclass.py
 !ur.py
 !url-import-test.ipynb

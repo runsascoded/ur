@@ -195,12 +195,6 @@ class Importer:
 
         return self.node_spec(fullname, node, mod_path)
 
-    def spec(self, fullname, node, origin=None, pkg=True):
-        spec = ModuleSpec(fullname, self, origin=str(origin), is_package=pkg)
-        spec._node = node
-        if pkg: spec.submodule_search_locations = []
-        return spec
-
     def node_spec(self, fullname, node, mod_path, throw=True):
         self.print(f'node_spec: node={node}, mod_path={mod_path}')
         full_path = mod_path
@@ -240,6 +234,16 @@ class Importer:
         self.print(f'Creating package spec {fullname} from {node} (origin={origin})')
         spec = self.spec(fullname, node, origin=origin, pkg=node.is_dir)
         self.node_spec_map[node] = spec
+        return spec
+
+    def spec(self, fullname, node, origin=None, pkg=True):
+        spec = ModuleSpec(fullname, self, origin=str(origin), is_package=pkg)
+        spec._node = node
+        if pkg:
+            if hasattr(node, 'path'):
+                spec.submodule_search_locations = [str(node.path)]
+            else:
+                spec.submodule_search_locations = []
         return spec
 
     def find_spec(self, fullname, path=None, target=None, mod_path=None):
@@ -299,9 +303,11 @@ class Importer:
         mod.__dict__['get_ipython'] = get_ipython
         mod.__spec__ = spec
         mod.__exec_count__ = 0
+        mod.__package__ = spec.parent
+        mod.__path__ = spec.submodule_search_locations
 
         if install:
-            self.print(f'Installing module {spec.name}: {mod}')
+            self.print(f'Installing module {spec.name}: {mod} ({mod.__package__})')
             sys.modules[spec.name] = mod
 
         return mod

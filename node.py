@@ -23,6 +23,10 @@ class Node:
 
         return lines
 
+    def __eq__(self, o): return isinstance(o, Node) and self.url == o.url
+    def __hash__(self): return hash(self.url)
+
+
 class PathNode(Node):
     def __init__(self, path):
         if isinstance(path, Node): return

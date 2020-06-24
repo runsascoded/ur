@@ -32,6 +32,7 @@ class Importer:
         self.shell = InteractiveShell.instance()
         self._print = print
         self.path = []
+        self.node_spec_map = {}
 
         default_urignore = Path.cwd() / '.urignore'
         if default_urignore.exists():
@@ -232,8 +233,14 @@ class Importer:
         else:
             raise ValueError(node)
 
+        if node in self.node_spec_map:
+            self.print(f'Returning cached spec for {fullname} (node={node}, origin={origin})')
+            return self.node_spec_map[node]
+
         self.print(f'Creating package spec {fullname} from {node} (origin={origin})')
-        return self.spec(fullname, node, origin=origin, pkg=node.is_dir)
+        spec = self.spec(fullname, node, origin=origin, pkg=node.is_dir)
+        self.node_spec_map[node] = spec
+        return spec
 
     def find_spec(self, fullname, path=None, target=None, mod_path=None):
         self.print(f'Importer.find_spec: fullname={fullname} path={path} target={target} mod_path={mod_path}')
@@ -280,12 +287,18 @@ class Importer:
 
     def create_module(self, spec, install=True):
         """Create a built-in module"""
+        if spec.name in sys.modules:
+            mod = sys.modules[spec.name]
+            self.print(f'Skipping re-creating module {spec.name}: {mod}')
+            return mod
+
         self.print(f'create_module {spec}')
         mod = ModuleType(spec.name)
         mod.__file__ = spec.origin
         mod.__loader__ = self
         mod.__dict__['get_ipython'] = get_ipython
         mod.__spec__ = spec
+        mod.__exec_count__ = 0
 
         if install:
             self.print(f'Installing module {spec.name}: {mod}')
@@ -345,6 +358,16 @@ class Importer:
     def exec(self, name, mod, node, root_path=None):
         self.print(f'exec: name={name} mod={mod} node={node} root_path={root_path}')
         dct = mod.__dict__
+        if mod.__exec_count__ > 0:
+            if node.name != '__init__.py':
+                self.print(f'Skipping re-executing module ({mod.__exec_count__}x): {name}')
+                return
+            else:
+                self.print(f'Executing module __init__.py: {name} ({mod})')
+        else:
+            self.print(f'Executing module {name} ({mod}) for first time ({mod.__exec_count__})')
+            mod.__exec_count__ += 1
+
         if not node: return
         if node.is_dir:
             if not root_path: root_path = [node]
@@ -383,15 +406,17 @@ class Importer:
                     mod_basename = self.mod_basename(name)
 
                     if not mod_basename:
-                        if child.is_dir:
+                        if child.is_dir \
+                            and not child.name.startswith('.') \
+                            and not child.name.startswith('__'):
                             mod_basename = child.name
                         else:
                             continue
 
                     skip_basenames = [
                         '__init__',
-                        '__pycache__',
-                        '.ipynb_checkpoints',
+                        #'__pycache__',
+                        #'.ipynb_checkpoints',
                         'setup',
                     ]
                     if mod_basename in skip_basenames: continue

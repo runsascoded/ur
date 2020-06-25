@@ -11,13 +11,28 @@ class Node:
     def __repr__(self): return str(self)
     def read(self): pass
     def read_text(self): return self.read().decode()
+    def read_lines(self, nonempty=True):
+        lines = [
+            line.rstrip('\n')
+            for line in
+            self.read_text().split('\n')
+        ]
+
+        if nonempty:
+            lines = [ line for line in lines if line ]
+
+        return lines
+
+    def __eq__(self, o): return isinstance(o, Node) and self.url == o.url
+    def __hash__(self): return hash(self.url)
+
 
 class PathNode(Node):
     def __init__(self, path):
         if isinstance(path, Node): return
         self.path = Path(path)
         self.name = self.path.name
-        self.url = str(path)
+        self.url = URL(path)
 
     @property
     def is_file(self): return self.path.is_file()

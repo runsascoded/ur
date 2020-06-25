@@ -12,7 +12,7 @@ setup(
       long_description_content_type='text/markdown',
       author='Ryan Williams',
       author_email='ryan@runsascoded.com',
-      py_modules=[ 'ur', 'cells', 'importer', 'opts', 'rgxs', 'url_loader', ],
+      py_modules=[ 'ur', 'cells', 'importer', 'opts', 'rgxs', 'urignore', 'url_loader', ],
       install_requires=[ 'jupyter', 'nbformat==4.4.0', 'GitPython', 'lxml', 'cssselect', 'urlpath', ],
       keywords=[ 'gists', 'imports', 'importlib', 'jupyter', 'notebooks', ],
       license='BSD',

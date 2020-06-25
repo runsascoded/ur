@@ -124,7 +124,7 @@ lines('echo','yay')  # wrapper around subprocess.check_output that asserts and r
 
 
 
-Importing from GitLab also works:
+Importing from GitLab also works; here we import a `cd` ("change directory") [contextmanager](https://docs.python.org/3/library/contextlib.html):
 
 
 ```python
@@ -292,15 +292,23 @@ from gist.abcdef0123456789abcdef0123456789 import *
 - [x] test/handle intra-gist imports
 - [ ] test/handle pip dependencies in gist imports
 - [ ] API for tagging/skipping cells in notebooks (visualizations, tests, etc.)
+- [ ] Context manager for controlling ancestor imports
+- [ ] Skip importing notebooks with [Papermill `parameters` tags](https://papermill.readthedocs.io/en/latest/usage-parameterize.html#designate-parameters-for-a-cell)
 - [ ] work with `importlib.reload`
 - [x] support `__init__.ipynb` (automatically load notebook when loading Gist), `__all__` (configure `import *` behavior)
 - [ ] more nuanced TTL / `skip_cache` behavior (e.g. let cached URLs time-out appropriately based on HTTP headers, a la [`requests-cache`](https://pypi.org/project/requests-cache/))
+- [ ] `setup.py` "extras" to allow for `pip`-installing only specific pieces (e.g. exclude gists/github/gitlab?)
+- [ ] use bare Git clones
 
 #### Usability
 - [ ] pretty-print info about what's imported (in notebook environments)
 - proper logging:
   - [ ] support `dict` for `opts.verbose`
   - [ ] colorized / rich log rendering (incl. HTML in notebook environments)
+
+Speed
+- [ ] do some benchmarking
+- [ ] read from `__pycache__`, when present, instead of compiling
 
 #### Import Sources
 - [x] support github / gitlab imports

@@ -1,5 +1,4 @@
 
-from functools import cached_property
 import git
 from os.path import basename, dirname, isfile, isdir, exists
 from os import listdir
@@ -30,6 +29,13 @@ class Node:
 
 
 class PathNode(Node):
+    nodes = {}
+
+    def __new__(cls, path, *args, **kwargs):
+        if path not in cls.nodes:
+            cls.nodes[path] = super(PathNode, cls).__new__(cls, path, *args, **kwargs)
+        return cls.nodes[path]
+
     def __init__(self, path):
         if isinstance(path, Node): return
         self.path = str(path)
@@ -45,10 +51,8 @@ class PathNode(Node):
     @property
     def exists(self): return exists(self.path)
 
-    #@cached_property
     @property
     def children(self):
-        #children = list(self.path.iterdir())
         return { name: PathNode(f'{self.path}/{name}') for name in listdir(self.path) }
 
     def read(self):

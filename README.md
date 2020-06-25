@@ -299,6 +299,7 @@ from gist.abcdef0123456789abcdef0123456789 import *
 - [ ] more nuanced TTL / `skip_cache` behavior (e.g. let cached URLs time-out appropriately based on HTTP headers, a la [`requests-cache`](https://pypi.org/project/requests-cache/))
 - [ ] `setup.py` "extras" to allow for `pip`-installing only specific pieces (e.g. exclude gists/github/gitlab?)
 - [ ] use bare Git clones
+- [ ] vet `.urignore` logic (I don't think it tracks which patterns are ignored for which directories, atm; all patterns end up glommed together and applied everywhere 🙀)
 
 #### Usability
 - [ ] pretty-print info about what's imported (in notebook environments)
@@ -307,7 +308,7 @@ from gist.abcdef0123456789abcdef0123456789 import *
   - [ ] colorized / rich log rendering (incl. HTML in notebook environments)
 
 Speed
-- [ ] do some benchmarking
+- [ ] do some benchmarking (WIP: [benchmark.ipynb](benchmark.ipynb))
 - [ ] read from `__pycache__`, when present, instead of compiling
 
 #### Import Sources

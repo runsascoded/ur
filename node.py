@@ -1,7 +1,6 @@
 
 import git
 from pathlib import Path
-from urlpath import URL
 
 class Node:
     def __new__(cls, *args, **kwargs):
@@ -32,7 +31,7 @@ class PathNode(Node):
         if isinstance(path, Node): return
         self.path = Path(path)
         self.name = self.path.name
-        self.url = URL(path)
+        self.url = path
 
     @property
     def is_file(self): return self.path.is_file()
@@ -63,7 +62,7 @@ class GitNode(Node):
         import _github, _gist
         if isinstance(obj, (_github.Commit, _gist.Commit)):
             tree = obj.commit.tree
-            self.url = URL(obj.www_url)
+            self.url = obj.www_url
             obj = tree
         elif not url:
             raise ValueError(f'No URL passed')
@@ -81,7 +80,7 @@ class GitNode(Node):
         blobs = self.obj.blobs
         trees = self.obj.trees
         return {
-            obj.name: GitNode(obj, self.url / obj.name)
+            obj.name: GitNode(obj, f'{self.url}/{obj.name}')
             for obj in (blobs + trees)
         }
 

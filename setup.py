@@ -13,7 +13,7 @@ setup(
       author='Ryan Williams',
       author_email='ryan@runsascoded.com',
       py_modules=[ 'ur', 'cells', 'importer', 'opts', 'rgxs', 'urignore', 'url_loader', ],
-      install_requires=[ 'jupyter', 'nbformat==4.4.0', 'GitPython', 'lxml', 'cssselect', 'urlpath', ],
+      install_requires=[ 'jupyter', 'nbformat==4.4.0', 'GitPython', 'lxml', 'cssselect', ],
       keywords=[ 'gists', 'imports', 'importlib', 'jupyter', 'notebooks', ],
       license='BSD',
       url='https://gitlab.com/runsascoded/ur',

@@ -4,3 +4,6 @@
 [submodule "examples/abcd_gist"]
 	path = examples/abcd_gist
 	url = https://gist.github.com/1288bff2f9e05394a94312010da267bb.git
+[submodule "df2"]
+	path = df2
+	url = https://github.com/ryan-williams/jupyter-rc.git

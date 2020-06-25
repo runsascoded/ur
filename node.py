@@ -2,7 +2,7 @@
 import git
 from os.path import basename, dirname, isfile, isdir, exists
 from os import listdir
-from pathlib import Path
+
 
 class Node:
     def __new__(cls, *args, **kwargs):

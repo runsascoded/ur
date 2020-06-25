@@ -1,7 +1,8 @@
 
 import git
-from pathlib import Path
-from urlpath import URL
+from os.path import basename, dirname, isfile, isdir, exists
+from os import listdir
+
 
 class Node:
     def __new__(cls, *args, **kwargs):
@@ -28,29 +29,35 @@ class Node:
 
 
 class PathNode(Node):
+    nodes = {}
+
+    def __new__(cls, path, *args, **kwargs):
+        if path not in cls.nodes:
+            cls.nodes[path] = super(PathNode, cls).__new__(cls, path, *args, **kwargs)
+        return cls.nodes[path]
+
     def __init__(self, path):
         if isinstance(path, Node): return
-        self.path = Path(path)
-        self.name = self.path.name
-        self.url = URL(path)
+        self.path = str(path)
+        self.name = basename(path)
+        self.url = path
 
     @property
-    def is_file(self): return self.path.is_file()
+    def is_file(self): return isfile(self.path)
 
     @property
-    def is_dir(self): return self.path.is_dir()
+    def is_dir(self): return isdir(self.path)
 
     @property
-    def exists(self): return self.path.exists()
+    def exists(self): return exists(self.path)
 
     @property
     def children(self):
-        children = list(self.path.iterdir())
-        return { p.name: PathNode(p) for p in children }
+        return { name: PathNode(f'{self.path}/{name}') for name in listdir(self.path) }
 
     def read(self):
         assert self.is_file
-        with self.path.open('rb') as f:
+        with open(self.path, 'rb') as f:
             return f.read()
 
     def __str__(self): return f'Node({self.path})'
@@ -63,7 +70,7 @@ class GitNode(Node):
         import _github, _gist
         if isinstance(obj, (_github.Commit, _gist.Commit)):
             tree = obj.commit.tree
-            self.url = URL(obj.www_url)
+            self.url = obj.www_url
             obj = tree
         elif not url:
             raise ValueError(f'No URL passed')
@@ -81,7 +88,7 @@ class GitNode(Node):
         blobs = self.obj.blobs
         trees = self.obj.trees
         return {
-            obj.name: GitNode(obj, self.url / obj.name)
+            obj.name: GitNode(obj, f'{self.url}/{obj.name}')
             for obj in (blobs + trees)
         }
 

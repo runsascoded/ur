@@ -1,5 +1,8 @@
 
+from functools import cached_property
 import git
+from os.path import basename, dirname, isfile, isdir, exists
+from os import listdir
 from pathlib import Path
 
 class Node:
@@ -29,27 +32,28 @@ class Node:
 class PathNode(Node):
     def __init__(self, path):
         if isinstance(path, Node): return
-        self.path = Path(path)
-        self.name = self.path.name
+        self.path = str(path)
+        self.name = basename(path)
         self.url = path
 
     @property
-    def is_file(self): return self.path.is_file()
+    def is_file(self): return isfile(self.path)
 
     @property
-    def is_dir(self): return self.path.is_dir()
+    def is_dir(self): return isdir(self.path)
 
     @property
-    def exists(self): return self.path.exists()
+    def exists(self): return exists(self.path)
 
+    #@cached_property
     @property
     def children(self):
-        children = list(self.path.iterdir())
-        return { p.name: PathNode(p) for p in children }
+        #children = list(self.path.iterdir())
+        return { name: PathNode(f'{self.path}/{name}') for name in listdir(self.path) }
 
     def read(self):
         assert self.is_file
-        with self.path.open('rb') as f:
+        with open(self.path, 'rb') as f:
             return f.read()
 
     def __str__(self): return f'Node({self.path})'

@@ -114,7 +114,7 @@ lines('echo','yay')  # wrapper around subprocess.check_output that asserts and r
 ```
 
     Cloning https://github.com/ryan-williams/jupyter-rc.git into .objs/Github/ryan-williams/jupyter-rc/clone
-    Running: ['echo', 'yay']
+    Running: echo yay
 
 
 
